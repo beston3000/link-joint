@@ -35,10 +35,7 @@
         // Import Firebase modules using CDN URLs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Enable Firestore Debug Logging
-        // setLogLevel('Debug');
+        import { getFirestore, doc, collection, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- PROVIDED FIREBASE CONFIGURATION ---
         const FALLBACK_FIREBASE_CONFIG = {
@@ -52,7 +49,8 @@
         };
 
         // --- Global Context Variables ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'link-joint';
+        // Use a clean version of the app ID for email generation
+        const appId = typeof __app_id !== 'undefined' ? __app_id.replace(/[^a-z0-9]/g, '') : 'link-joint';
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : FALLBACK_FIREBASE_CONFIG;
@@ -68,11 +66,19 @@
         let links = [];
         let loading = false;
         let message = '';
-        let emailInput = '';
+        let usernameInput = '';
         let passwordInput = '';
         let editingLink = null;
+        let currentView = 'library'; // New state for tabs: 'library', 'categories', 'users'
         
         // --- Utility Functions ---
+
+        /** Generates a dummy email address for Firebase Auth based on the username. */
+        const generateEmail = (username) => {
+            // Remove non-alphanumeric characters for a safe local part
+            const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, ''); 
+            return `${cleanUsername}@${appId}.com`;
+        };
 
         /** Shows a temporary message in the UI. */
         const showMessage = (msg, isSuccess = false) => {
@@ -98,9 +104,9 @@
             renderApp();
         };
 
-        /** Updates the global email state. */
-        const setEmail = (value) => {
-            emailInput = value;
+        /** Updates the global username state. */
+        const setUsername = (value) => {
+            usernameInput = value;
         };
 
         /** Updates the global password state. */
@@ -108,36 +114,46 @@
             passwordInput = value;
         };
 
+        /** Updates the global currentView state and forces a re-render. */
+        const setView = (viewName) => {
+            currentView = viewName;
+            renderApp();
+        }
+
         // --- Authentication Logic ---
 
         const handleAuthAction = async (actionType) => {
             setLoading(true);
             message = ''; // Clear message
 
+            // Generate the email required by Firebase Auth from the username
+            const emailToUse = generateEmail(usernameInput);
+
             try {
                 if (actionType === 'signup') {
-                    const userCredential = await createUserWithEmailAndPassword(auth, emailInput, passwordInput);
+                    const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, passwordInput);
                     const newUser = userCredential.user;
 
-                    // Create the initial profile document with isApproved: false
+                    // Create the initial profile document with the user's name and default 'user' role
                     const profileDocRef = doc(db, `artifacts/${appId}/users/${newUser.uid}/profiles`, 'profile');
                     await setDoc(profileDocRef, { 
-                        email: emailInput, 
-                        isApproved: false, 
-                        role: 'user', 
+                        userId: newUser.uid, // Explicitly store userId
+                        name: usernameInput, // Store the chosen username/name
+                        role: 'user',        // Default role is 'user'
                         createdAt: Date.now() 
                     });
                     
-                    showMessage(`Sign-up successful! Your account is pending admin approval.`, true);
+                    showMessage(`Sign-up successful! Welcome, ${usernameInput}!`, true);
 
                 } else if (actionType === 'signin') {
-                    await signInWithEmailAndPassword(auth, emailInput, passwordInput);
+                    await signInWithEmailAndPassword(auth, emailToUse, passwordInput);
 
                 } else if (actionType === 'signout') {
                     await signOut(auth);
                     user = null;
                     userProfile = null;
                     links = [];
+                    currentView = 'library'; // Reset view on signout
                     showMessage('Successfully signed out.', true);
                     renderApp(); // Force render to Auth screen
                 }
@@ -158,27 +174,19 @@
 
             onSnapshot(profileDocRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    const profileData = docSnap.data();
                     userProfile = {
-                        ...profileData,
+                        ...docSnap.data(),
                         id: docSnap.id
                     };
-                    showMessage('', true);
                 } else {
-                    userProfile = { isApproved: false, role: 'anonymous' };
-                    // FIX: Check if 'user' is null before accessing its properties.
-                    if (user && !user.isAnonymous) { 
-                         showMessage("Profile not found. If you just signed up, your approval is pending.", false);
-                    }
+                    // Fallback profile if doc doesn't exist 
+                    userProfile = { name: 'Unknown User', role: 'user', userId: userId }; 
                 }
                 renderApp();
-                // Setup links listener only if approved
-                if (userProfile && userProfile.isApproved) {
-                    setupLinksListener(userId);
-                }
+                setupLinksListener(userId);
             }, (error) => {
                 console.error("Error listening to profile:", error);
-                showMessage("Failed to load user profile/approval status.", false);
+                showMessage("Failed to load user profile.", false);
                 renderApp();
             });
         };
@@ -208,7 +216,7 @@
         // --- Link Management CRUD ---
         
         const handleAddLink = async (url, title, category) => {
-            if (!user.uid || !userProfile?.isApproved) return;
+            if (!user?.uid) return;
             setLoading(true);
             try {
                 const linksCollectionRef = collection(db, `artifacts/${appId}/users/${user.uid}/userLinks`);
@@ -220,7 +228,6 @@
                     createdAt: Date.now()
                 });
                 showMessage('Link added successfully!', true);
-                // Clear inputs manually in the AppScreen render function's event listener
             } catch (error) {
                 console.error("Error adding link:", error);
                 showMessage('Failed to add link.', false);
@@ -230,7 +237,7 @@
         };
 
         const handleUpdateLink = async (id, updates) => {
-            if (!user.uid || !userProfile?.isApproved) return;
+            if (!user?.uid) return;
             try {
                 const linkDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/userLinks`, id);
                 await updateDoc(linkDocRef, updates);
@@ -242,7 +249,7 @@
         };
 
         const handleDeleteLink = async (id) => {
-            if (!user.uid || !userProfile?.isApproved) return;
+            if (!user?.uid) return;
             try {
                 const linkDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/userLinks`, id);
                 await deleteDoc(linkDocRef);
@@ -253,45 +260,24 @@
             }
         };
         
-        const toggleAdminApproval = async () => {
-            if (!user.uid) return;
-            setLoading(true);
-            try {
-                const profileDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/profiles`, 'profile');
-                const newStatus = !userProfile?.isApproved;
-                
-                await updateDoc(profileDocRef, { 
-                    isApproved: newStatus,
-                    role: 'admin'
-                });
-                
-                showMessage(`Approval status toggled to: ${newStatus ? 'Approved' : 'Pending'}.`, true);
-            } catch (error) {
-                console.error("Error toggling approval:", error);
-                showMessage("Failed to toggle approval.", false);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-
         // --- UI Rendering Components (DOM Generation) ---
 
         const renderAuthScreen = () => {
-            const userId = user?.uid || 'Unknown';
+            const userId = user?.uid || 'N/A';
             const html = `
                 <div class="p-8 bg-white/5 backdrop-blur-sm rounded-xl shadow-2xl w-full max-w-md">
                     <h2 class="text-3xl font-extrabold mb-6 text-indigo-400">Secure Link Manager</h2>
                     <div class="text-xs text-gray-500 mb-4 break-words">Session ID: ${userId}</div>
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-300 mb-1" for="email">Email</label>
+                        <label class="block text-sm font-medium text-gray-300 mb-1" for="username">Username</label>
                         <input
-                            id="auth-email"
-                            type="email"
-                            value="${emailInput}"
-                            oninput="setEmail(this.value)"
-                            placeholder="user@example.com"
+                            id="auth-username"
+                            type="text"
+                            value="${usernameInput}"
+                            oninput="setUsername(this.value)"
+                            placeholder="choose_a_username"
+                            required
                             class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                         />
                     </div>
@@ -303,23 +289,24 @@
                             value="${passwordInput}"
                             oninput="setPassword(this.value)"
                             placeholder="••••••••"
+                            required
                             class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                         />
                     </div>
                     <div class="flex flex-col space-y-4">
                         <button
                             id="signin-btn"
-                            disabled="${loading || !emailInput || !passwordInput}"
+                            disabled="${loading || !usernameInput || !passwordInput}"
                             class="w-full py-2 px-4 rounded-lg font-semibold text-white transition duration-200 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                         >
                             ${loading ? 'Signing In...' : 'Sign In'}
                         </button>
                         <button
                             id="signup-btn"
-                            disabled="${loading || !emailInput || !passwordInput}"
+                            disabled="${loading || !usernameInput || !passwordInput}"
                             class="w-full py-2 px-4 rounded-lg font-semibold text-indigo-300 transition duration-200 border border-indigo-500 hover:bg-indigo-500 hover:text-white disabled:opacity-50"
                         >
-                            ${loading ? 'Signing Up...' : 'Sign Up (Pending Approval)'}
+                            ${loading ? 'Signing Up...' : 'Sign Up'}
                         </button>
                     </div>
                 </div>
@@ -332,45 +319,48 @@
             appDiv.querySelector('#signup-btn').onclick = () => handleAuthAction('signup');
         };
 
-        const renderUnapprovedScreen = () => {
-            const userId = user?.uid || 'N/A';
-            const html = `
-                <div class="p-10 text-center bg-red-900/40 border border-red-700 rounded-xl shadow-2xl w-full max-w-lg">
-                    <h2 class="text-3xl font-extrabold mb-4 text-red-300">Access Denied</h2>
-                    <p class="text-gray-200 mb-6">
-                        Thank you for registering! Your account 
-                        <strong class="font-bold">${userProfile?.email || 'is waiting'}</strong> 
-                        is currently pending administrative approval. Please check back later.
-                    </p>
-                    
-                    <div class="bg-red-800/50 p-3 rounded-lg text-sm text-red-200 mb-6 break-words">
-                        <p class="font-semibold">Your User ID:</p>
-                        <p>${userId}</p>
-                    </div>
-                    
+        const getCategories = () => {
+            const categorySet = new Set(links.map(l => l.category).filter(c => c));
+            return ['General', 'Work', 'Personal', ...Array.from(categorySet)].sort();
+        };
+
+        const getTabButton = (viewName, label) => {
+            const isActive = currentView === viewName;
+            return `
+                <button
+                    data-view="${viewName}"
+                    onclick="setView('${viewName}')"
+                    class="py-2 px-4 text-sm font-semibold transition-colors duration-200 
+                        ${isActive 
+                            ? 'text-white border-b-2 border-indigo-500' 
+                            : 'text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-700'}
+                ">
+                    ${label}
+                </button>
+            `;
+        };
+
+        const renderHeaderAndTabs = () => {
+            return `
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-3xl font-extrabold text-white">Secure Link Manager</h2>
                     <button
-                        id="toggle-approval-btn"
-                        disabled="${loading}"
-                        class="w-full py-2 px-4 rounded-lg font-semibold text-white transition duration-200 bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                    >
-                        ${loading ? 'Processing...' : 'DEMO: Approve/Unapprove Account'}
-                    </button>
-                    
-                    <button
-                        id="signout-unapproved-btn"
-                        class="mt-4 text-sm text-red-300 hover:text-red-100 transition duration-200"
+                        id="signout-app-btn"
+                        class="py-1 px-3 text-sm rounded-lg font-semibold text-red-300 border border-red-500 hover:bg-red-500 hover:text-white transition duration-200"
                     >
                         Sign Out
                     </button>
                 </div>
+                <div class="border-b border-gray-700 mb-6 flex space-x-4">
+                    ${getTabButton('library', 'Link Library')}
+                    ${getTabButton('categories', 'Categories')}
+                    ${getTabButton('users', 'Users & Roles')}
+                </div>
             `;
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = html;
+        }
 
-            // Attach event listeners
-            appDiv.querySelector('#toggle-approval-btn').onclick = toggleAdminApproval;
-            appDiv.querySelector('#signout-unapproved-btn').onclick = () => handleAuthAction('signout');
-        };
+
+        // --- Views ---
 
         const renderLinkItem = (link) => `
             <div class="bg-gray-700/50 p-4 rounded-lg flex justify-between items-center transition duration-150 hover:bg-gray-600/70 shadow-md mb-2">
@@ -403,6 +393,116 @@
                 </div>
             </div>
         `;
+
+        const renderLinkLibrary = () => {
+            const categories = getCategories();
+            
+            const linksHtml = links.length === 0 ? 
+                '<p class="text-gray-400 text-center py-8">No links found. Start by adding one above!</p>' : 
+                links.map(renderLinkItem).join('');
+
+            return `
+                <div class="w-full">
+                    <!-- Add Link Form -->
+                    <form id="add-link-form" class="bg-gray-700 p-4 rounded-lg shadow-inner mb-6 space-y-3">
+                        <div class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0">
+                             <div class="flex-grow">
+                                <input
+                                    type="url"
+                                    id="link-url"
+                                    placeholder="Paste link URL here (e.g., https://google.com)"
+                                    required
+                                    class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                            </div>
+                            <div class="flex-grow">
+                                 <input
+                                    type="text"
+                                    id="link-title"
+                                    placeholder="Link Title (Optional)"
+                                    class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                            </div>
+                        </div>
+                        <div class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0 items-center">
+                            <select
+                                id="link-category"
+                                class="w-full md:w-1/3 px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                                ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                            </select>
+                            <button
+                                type="submit"
+                                id="add-link-btn"
+                                disabled="${loading}"
+                                class="w-full md:w-2/3 py-2 px-4 rounded-lg font-semibold text-white transition duration-200 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                ${loading ? 'Adding...' : 'Add Link'}
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Link List -->
+                    <h3 class="text-xl font-bold text-gray-300 mb-3 border-b border-gray-700 pb-2">${links.length} Links</h3>
+                    <div id="link-list" class="link-list-container space-y-3 max-h-96 overflow-y-auto pr-2">
+                        ${linksHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        const renderCategoriesScreen = () => {
+            const categories = getCategories();
+            const categoryCount = categories.length;
+
+            const categoryListHtml = categories.map(cat => `
+                <div class="bg-gray-700/50 p-3 rounded-lg flex justify-between items-center shadow-md">
+                    <span class="text-lg font-semibold text-indigo-300">${cat}</span>
+                    <span class="text-sm text-gray-400">${links.filter(l => l.category === cat).length} links</span>
+                </div>
+            `).join('');
+
+            return `
+                <div class="w-full">
+                    <h3 class="text-2xl font-bold text-white mb-4">Total Categories: ${categoryCount}</h3>
+                    <div class="link-list-container space-y-3 max-h-96 overflow-y-auto pr-2">
+                        ${categoryListHtml || '<p class="text-gray-400 text-center py-8">No categories created yet.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        const renderUsersScreen = () => {
+            const userId = user?.uid;
+
+            return `
+                <div class="w-full">
+                    <h3 class="text-2xl font-bold text-white mb-4">Your Account Details</h3>
+                    <div class="space-y-4 p-4 bg-gray-700/50 rounded-lg shadow-md">
+                        <div class="flex justify-between border-b border-gray-600 pb-2">
+                            <span class="font-medium text-gray-400">Username:</span>
+                            <span class="font-semibold text-indigo-300">${userProfile?.name || 'Loading...'}</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-600 pb-2">
+                            <span class="font-medium text-gray-400">Role:</span>
+                            <span class="font-semibold text-green-400">${userProfile?.role || 'user'}</span>
+                        </div>
+                        <div class="break-words">
+                            <span class="font-medium text-gray-400 block mb-1">User ID:</span>
+                            <code class="text-xs text-gray-300 bg-gray-800 p-2 rounded block">${userId}</code>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-bold text-white mt-8 mb-4">Requested Users (Admin View)</h3>
+                    <div class="p-4 bg-yellow-900/50 border border-yellow-700 rounded-lg text-yellow-200">
+                        This view is ready for future admin features! To enable multi-user management, user profiles would need to be stored in a publicly queryable collection to list all accounts. Currently, the application only loads your private profile.
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // --- Modals ---
 
         const renderEditModal = () => {
             if (!editingLink) return;
@@ -480,139 +580,89 @@
             };
         };
         
-        const getCategories = () => {
-            const categorySet = new Set(links.map(l => l.category).filter(c => c));
-            return ['General', 'Work', 'Personal', ...Array.from(categorySet)].sort();
-        };
-
-        const renderAppScreen = () => {
-            const userId = user?.uid;
-            const categories = getCategories();
-            
-            const linksHtml = links.length === 0 ? 
-                '<p class="text-gray-400 text-center py-8">No links found. Start by adding one above!</p>' : 
-                links.map(renderLinkItem).join('');
-
-            const html = `
-                <div class="w-full max-w-4xl p-6 bg-gray-800 rounded-xl shadow-2xl">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-3xl font-extrabold text-white">Your Link Library</h2>
-                        <button
-                            id="signout-app-btn"
-                            class="py-1 px-3 text-sm rounded-lg font-semibold text-red-300 border border-red-500 hover:bg-red-500 hover:text-white transition duration-200"
-                        >
-                            Sign Out
-                        </button>
-                    </div>
-
-                    <div class="text-sm text-gray-400 mb-4 break-words">
-                        User: ${userProfile?.email || userId} (ID: ${userId}) - Status: <span class="text-green-400 font-bold">Approved</span>
-                    </div>
-                    
-                    <!-- Add Link Form -->
-                    <form id="add-link-form" class="bg-gray-700 p-4 rounded-lg shadow-inner mb-6 space-y-3">
-                        <div class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0">
-                             <div class="flex-grow">
-                                <input
-                                    type="url"
-                                    id="link-url"
-                                    placeholder="Paste link URL here (e.g., https://google.com)"
-                                    required
-                                    class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                            <div class="flex-grow">
-                                 <input
-                                    type="text"
-                                    id="link-title"
-                                    placeholder="Link Title (Optional)"
-                                    class="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                        </div>
-                        <div class="flex flex-col md:flex-row md:space-x-3 space-y-3 md:space-y-0 items-center">
-                            <select
-                                id="link-category"
-                                class="w-full md:w-1/3 px-4 py-2 border border-gray-600 rounded-lg bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500"
-                            >
-                                ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
-                            </select>
-                            <button
-                                type="submit"
-                                id="add-link-btn"
-                                disabled="${loading}"
-                                class="w-full md:w-2/3 py-2 px-4 rounded-lg font-semibold text-white transition duration-200 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-                            >
-                                ${loading ? 'Adding...' : 'Add Link'}
-                            </button>
-                        </div>
-                    </form>
-
-                    <!-- Link List -->
-                    <h3 class="text-xl font-bold text-gray-300 mb-3 border-b border-gray-700 pb-2">${links.length} Links</h3>
-                    <div id="link-list" class="link-list-container space-y-3 max-h-96 overflow-y-auto pr-2">
-                        ${linksHtml}
-                    </div>
-                </div>
-            `;
-            const appDiv = document.getElementById('app');
-            appDiv.innerHTML = html;
-
-            // Attach event listeners
-            appDiv.querySelector('#signout-app-btn').onclick = () => handleAuthAction('signout');
-            
-            // Add Link Form Listener
-            appDiv.querySelector('#add-link-form').onsubmit = (e) => {
-                e.preventDefault();
-                const url = document.getElementById('link-url').value;
-                const title = document.getElementById('link-title').value;
-                const category = document.getElementById('link-category').value;
-                
-                if (url.trim()) {
-                    handleAddLink(url.trim(), title.trim(), category);
-                    // Clear inputs after submission
-                    document.getElementById('link-url').value = '';
-                    document.getElementById('link-title').value = '';
-                    document.getElementById('link-category').value = 'General';
-                }
-            };
-            
-            // Link List Actions (Edit/Delete) Listener
-            appDiv.querySelector('#link-list').addEventListener('click', (e) => {
-                const targetBtn = e.target.closest('button[data-link-id]');
-                if (!targetBtn) return;
-
-                const linkId = targetBtn.dataset.linkId;
-                const action = targetBtn.dataset.action;
-                const linkToModify = links.find(l => l.id === linkId);
-
-                if (!linkToModify) return;
-
-                if (action === 'edit') {
-                    editingLink = linkToModify;
-                    renderEditModal();
-                } else if (action === 'delete') {
-                    // In a real app, this should be a custom modal, but here we use the handler directly
-                    handleDeleteLink(linkId);
-                }
-            });
-        };
 
         // --- Main Render Function (The "switchboard") ---
 
         const renderApp = () => {
             const appDiv = document.getElementById('app');
-            if (loading && !message) {
+
+            if (loading && !message && !authReady) {
                  appDiv.innerHTML = `<div class="text-white text-xl animate-pulse">Loading...</div>`;
-            } else if (!authReady || !user || user.isAnonymous || !userProfile) {
-                // Show Auth screen if not fully logged in or profile not determined
+                 return;
+            } 
+            
+            if (!authReady || !user || user.isAnonymous) {
+                // Show Auth screen if not authenticated (logged out or anonymous session)
                 renderAuthScreen();
-            } else if (userProfile && !userProfile.isApproved) {
-                // Logged in but profile is not approved
-                renderUnapprovedScreen();
+                return;
+            }
+
+            // Logged in (non-anonymous) - Render Main App Container
+            let contentHtml = '';
+            if (currentView === 'categories') {
+                contentHtml = renderCategoriesScreen();
+            } else if (currentView === 'users') {
+                contentHtml = renderUsersScreen();
             } else {
-                // Logged in and approved
-                renderAppScreen();
+                // Default to library
+                contentHtml = renderLinkLibrary();
+            }
+
+            const appHtml = `
+                <div class="w-full max-w-4xl p-6 bg-gray-800 rounded-xl shadow-2xl">
+                    ${renderHeaderAndTabs()}
+                    ${contentHtml}
+                </div>
+            `;
+            appDiv.innerHTML = appHtml;
+
+            // Attach Global Listeners for Authenticated View
+            const signoutBtn = appDiv.querySelector('#signout-app-btn');
+            if (signoutBtn) {
+                signoutBtn.onclick = () => handleAuthAction('signout');
+            }
+
+            // Attach Listeners specific to the Link Library tab
+            if (currentView === 'library') {
+                const addLinkForm = appDiv.querySelector('#add-link-form');
+                const linkList = appDiv.querySelector('#link-list');
+
+                if (addLinkForm) {
+                    addLinkForm.onsubmit = (e) => {
+                        e.preventDefault();
+                        const url = document.getElementById('link-url').value;
+                        const title = document.getElementById('link-title').value;
+                        const category = document.getElementById('link-category').value;
+                        
+                        if (url.trim()) {
+                            handleAddLink(url.trim(), title.trim(), category);
+                            // Clear inputs after submission
+                            document.getElementById('link-url').value = '';
+                            document.getElementById('link-title').value = '';
+                            document.getElementById('link-category').value = 'General';
+                        }
+                    };
+                }
+
+                if (linkList) {
+                    linkList.addEventListener('click', (e) => {
+                        const targetBtn = e.target.closest('button[data-link-id]');
+                        if (!targetBtn) return;
+
+                        const linkId = targetBtn.dataset.linkId;
+                        const action = targetBtn.dataset.action;
+                        const linkToModify = links.find(l => l.id === linkId);
+
+                        if (!linkToModify) return;
+
+                        if (action === 'edit') {
+                            editingLink = linkToModify;
+                            renderEditModal();
+                        } else if (action === 'delete') {
+                            handleDeleteLink(linkId);
+                        }
+                    });
+                }
             }
         };
 
@@ -628,31 +678,28 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                
-                // Auth State Listener
-                onAuthStateChanged(auth, async (currentUser) => {
-                    if (currentUser) {
+
+                // --- Initial Sign-In (Mandatory) ---
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.error("Initial Authentication Error:", e.message);
+                }
+
+                // --- Auth State Listener ---
+                onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser && !currentUser.isAnonymous) {
                         user = currentUser;
-                        // Sign in with custom token if provided
-                        if (initialAuthToken && !currentUser.isAnonymous) {
-                             try {
-                                await signInWithCustomToken(auth, initialAuthToken);
-                             } catch(e) {
-                                console.error("Custom token sign-in failed:", e);
-                             }
-                        }
                         setupProfileListener(currentUser.uid);
                     } else {
-                        // Attempt anonymous sign-in on first load if no user is present
-                        if (!user) { 
-                             try {
-                                await signInAnonymously(auth);
-                             } catch(e) {
-                                console.error("Anonymous sign-in failed:", e);
-                             }
-                        }
-                        user = null;
+                        // User is null (signed out) OR anonymous (no profile expected).
+                        user = currentUser;
                         userProfile = null;
+                        links = [];
                     }
                     authReady = true;
                     renderApp();
@@ -667,9 +714,10 @@
         // Start the application after the DOM is fully loaded
         document.addEventListener('DOMContentLoaded', initializeAppAndAuth);
 
-        // Expose global functions for HTML inline event handlers (like oninput)
-        window.setEmail = setEmail;
+        // Expose global functions for HTML inline event handlers (like oninput and onclick)
+        window.setUsername = setUsername;
         window.setPassword = setPassword;
+        window.setView = setView;
     </script>
 </body>
 </html>
