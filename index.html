@@ -4,70 +4,21 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Link Joint</title>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+<!-- FIREBASE COMPAT (NO MODULES) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
 <style>
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  background: #0f1116;
-  color: #e5e5e5;
-}
-header {
-  background: #1a1d24;
-  padding: 20px;
-  text-align: center;
-  font-size: 24px;
-  font-weight: bold;
-  color: #fff;
-  border-bottom: 1px solid #333;
-}
-.container {
-  max-width: 900px;
-  margin: 20px auto;
-  padding: 20px;
-  background: #1a1d24;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.4);
-}
-input, select {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  border: 1px solid #444;
-  background: #0f1116;
-  color: #fff;
-}
-button {
-  padding: 10px 16px;
-  border: none;
-  background: #3b82f6;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-  font-size: 15px;
-  margin-right: 5px;
-}
-button:hover {
-  background: #60a5fa;
-}
-.card {
-  background: #242832;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-  border: 1px solid #333;
-}
-.category-label {
-  font-size: 13px;
-  color: #9ca3af;
-}
-.flex {
-  display: flex;
-  gap: 10px;
-}
+body { font-family: Arial, sans-serif; margin: 0; background: #0f1116; color: #e5e5e5; }
+header { background: #1a1d24; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; color: #fff; border-bottom: 1px solid #333; }
+.container { max-width: 900px; margin: 20px auto; padding: 20px; background: #1a1d24; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #444; background: #0f1116; color: #fff; }
+button { padding: 10px 16px; border: none; background: #3b82f6; border-radius: 8px; color: white; cursor: pointer; font-size: 15px; margin-right: 5px; }
+button:hover { background: #60a5fa; }
+.card { background: #242832; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #333; }
+.category-label { font-size: 13px; color: #9ca3af; }
 </style>
 </head>
 <body>
@@ -89,7 +40,6 @@ button:hover {
 
     <hr>
 
-    <!-- CATEGORY MANAGEMENT -->
     <h2>Categories</h2>
     <div id="category-create" style="display:none;">
       <input id="new-category-name" placeholder="Category Name" />
@@ -99,7 +49,6 @@ button:hover {
 
     <hr>
 
-    <!-- LINK MANAGEMENT -->
     <h2>Links</h2>
     <div id="link-create" style="display:none;">
       <input id="new-link-title" placeholder="Link Title" />
@@ -111,7 +60,6 @@ button:hover {
 
     <hr>
 
-    <!-- ADMIN PANEL -->
     <div id="admin-panel" style="display:none;">
       <h2>Admin Panel: Manage Users</h2>
       <div id="users-list"></div>
@@ -120,7 +68,8 @@ button:hover {
 </div>
 
 <script>
-// Firebase init\const firebaseConfig = {
+// Firebase Compat Init
+const firebaseConfig = {
   apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
   authDomain: "link-joint.firebaseapp.com",
   projectId: "link-joint",
@@ -137,7 +86,7 @@ const db = firebase.firestore();
 let currentUser = null;
 let currentData = null;
 
-function emailFromUser(u){return u+"@website.com";}
+function emailFromUser(u){ return u + "@website.com"; }
 
 async function register(){
   const u = username.value.trim();
@@ -147,24 +96,27 @@ async function register(){
     const cred = await auth.createUserWithEmailAndPassword(emailFromUser(u), p);
     await db.collection("user_data").doc(cred.user.uid).set({username:u, role:"unapproved", permission_lvl:0});
     authMsg("Account created. Await approval.");
-  }catch(e){authMsg(e.message);} }
+  }catch(e){ authMsg(e.message); }
+}
 
 async function login(){
   const u = username.value.trim();
   const p = password.value;
   if(!u||!p) return authMsg("Enter username & password");
-  try{await auth.signInWithEmailAndPassword(emailFromUser(u), p);}catch(e){authMsg(e.message);} }
+  try{ await auth.signInWithEmailAndPassword(emailFromUser(u), p); }
+  catch(e){ authMsg(e.message); }
+}
 
-function authMsg(m){document.getElementById("auth-msg").innerText = m;}
+function authMsg(m){ document.getElementById("auth-msg").innerText = m; }
 
 auth.onAuthStateChanged(async(user)=>{
-  if(!user){document.getElementById("app").style.display="none";return;}
+  if(!user){ document.getElementById("app").style.display="none"; return; }
   currentUser = user;
   const snap = await db.collection("user_data").doc(user.uid).get();
-  if(!snap.exists){authMsg("No user data."); return;}
+  if(!snap.exists){ authMsg("No user data."); return; }
 
   currentData = snap.data();
-  if(currentData.permission_lvl===0){authMsg("Awaiting approval."); logout(); return;}
+  if(currentData.permission_lvl === 0){ authMsg("Awaiting approval."); logout(); return; }
 
   document.getElementById("auth-section").style.display="none";
   document.getElementById("app").style.display="block";
@@ -179,7 +131,7 @@ auth.onAuthStateChanged(async(user)=>{
   if(currentData.role==="admin") adminPanel.style.display="block", loadAllUsers();
 });
 
-function logout(){auth.signOut(); location.reload();}
+function logout(){ auth.signOut(); location.reload(); }
 
 // CATEGORY FUNCTIONS
 async function loadCategories(){
@@ -192,7 +144,6 @@ async function loadCategories(){
   snap.forEach(doc=>{
     const c = doc.data();
     sel.innerHTML += `<option value="${doc.id}">${c.name}</option>`;
-
     let html = `<div class='card'><b>${c.name}</b>`;
 
     if(currentData.permission_lvl===2 && c.creator===currentUser.uid){
@@ -246,41 +197,4 @@ async function createLink(){
   loadLinks();
 }
 
-async function deleteLink(id){
-  await db.collection("links").doc(id).delete();
-  loadLinks();
-}
-
-// ADMIN PANEL
-async function loadAllUsers(){
-  const list = document.getElementById("users-list");
-  list.innerHTML = "";
-  const snap = await db.collection("user_data").get();
-  snap.forEach(doc=>{
-    const u = doc.data();
-    list.innerHTML += `<div class='card'>
-      <b>${u.username}</b><br>
-      Role: <select onchange='updateUser("${doc.id}", "role", this.value)'>
-        <option ${u.role=="unapproved"?"selected":""}>unapproved</option>
-        <option ${u.role=="user"?"selected":""}>user</option>
-        <option ${u.role=="admin"?"selected":""}>admin</option>
-        <option ${u.role=="owner"?"selected":""}>owner</option>
-      </select><br>
-
-      Permission: <select onchange='updateUser("${doc.id}", "permission_lvl", Number(this.value))'>
-        <option value="0" ${u.permission_lvl==0?"selected":""}>0</option>
-        <option value="1" ${u.permission_lvl==1?"selected":""}>1</option>
-        <option value="2" ${u.permission_lvl==2?"selected":""}>2</option>
-        <option value="3" ${u.permission_lvl==3?"selected":""}>3</option>
-      </select>
-    </div>`;
-  });
-}
-
-async function updateUser(id, field, value){
-  await db.collection("user_data").doc(id).update({[field]:value});
-  loadAllUsers();
-}
-</script>
-</body>
-</html>
+async function deleteLink
