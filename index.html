@@ -1,200 +1,397 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Link Joint</title>
-
-<!-- FIREBASE COMPAT (NO MODULES) -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
-<style>
-body { font-family: Arial, sans-serif; margin: 0; background: #0f1116; color: #e5e5e5; }
-header { background: #1a1d24; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; color: #fff; border-bottom: 1px solid #333; }
-.container { max-width: 900px; margin: 20px auto; padding: 20px; background: #1a1d24; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
-input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #444; background: #0f1116; color: #fff; }
-button { padding: 10px 16px; border: none; background: #3b82f6; border-radius: 8px; color: white; cursor: pointer; font-size: 15px; margin-right: 5px; }
-button:hover { background: #60a5fa; }
-.card { background: #242832; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #333; }
-.category-label { font-size: 13px; color: #9ca3af; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Link Joint — Categories & Approval</title>
+  <!-- Firebase compat (no-modules) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    :root{--bg:#0f1116;--card:#17181b;--muted:#9ca3af;--accent:#3b82f6;--danger:#e55353}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; background:linear-gradient(180deg,#0b0d10 0%,#0f1116 100%); color:#e6eef6}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .card{background:linear-gradient(180deg,var(--card),#131416);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.02);box-shadow:0 6px 30px rgba(2,6,23,0.6);}
+    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;box-sizing:border-box}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    .row{display:flex;gap:10px;align-items:center}
+    button{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent)}
+    button.danger{background:var(--danger)}
+    .muted{color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+    .links, .categories, .admin, .pending{display:grid;gap:10px;margin-top:10px}
+    .item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);background:rgba(255,255,255,0.01)}
+    a{color:inherit}
+    .badge{background:rgba(59,130,246,0.12);color:var(--accent);padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-<header>Link Joint</header>
-<div class="container">
-  <div id="auth-section">
-    <h2>Login / Register</h2>
-    <input id="username" placeholder="Username (no email needed)" />
-    <input id="password" type="password" placeholder="Password" />
-    <button onclick="login()">Login</button>
-    <button onclick="register()">Register</button>
-    <p id="auth-msg"></p>
+  <div class="wrap">
+    <header>
+      <h1>Link Joint — Categories & Approval</h1>
+      <div id="auth-card" class="card" style="min-width:320px">
+        <div id="signed-out-ui">
+          <div style="font-weight:700">Sign in / Sign up</div>
+          <div class="muted" style="margin-bottom:8px">Enter username (eg. <code>eeeee24</code>) and password. Email = <code>username@website.com</code></div>
+          <label>Username</label>
+          <input id="username" placeholder="username" autocomplete="username" />
+          <label>Password</label>
+          <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+          <div class="row" style="margin-top:8px">
+            <button id="btn-signup">Create account</button>
+            <button id="btn-signin" class="ghost">Sign in</button>
+          </div>
+          <div id="auth-msg" class="muted" style="margin-top:10px"></div>
+        </div>
+
+        <div id="signed-in-ui" class="hidden">
+          <div style="font-weight:700">Signed in as <span id="user-display"></span></div>
+          <div class="muted" id="user-role-display" style="margin-top:6px"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="btn-logout" class="ghost">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section>
+        <div id="links-panel" class="card hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h2 style="margin:0">Links <span id="perm-badge" class="badge"></span></h2>
+            <div class="muted" id="permission-hint"></div>
+          </div>
+
+          <div id="create-link-form" style="margin-top:12px" class="hidden card">
+            <label>Title</label>
+            <input id="link-title" placeholder="Link title" />
+            <label>URL</label>
+            <input id="link-url" placeholder="https://example.com" />
+            <label>Category</label>
+            <select id="link-category-select"><option value="none">Unsorted</option></select>
+            <div class="row" style="margin-top:8px">
+              <button id="btn-create-link">Create link</button>
+            </div>
+          </div>
+
+          <div id="links-list" class="links" style="margin-top:12px"></div>
+        </div>
+
+        <div id="categories-panel" class="card hidden" style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h2 style="margin:0">Categories</h2>
+            <div class="muted">Same permission rules as links</div>
+          </div>
+
+          <div id="create-category-form" class="card hidden" style="margin-top:12px">
+            <label>New category name</label>
+            <input id="category-name" placeholder="Category name" />
+            <div class="row" style="margin-top:8px">
+              <button id="btn-create-category">Create category</button>
+            </div>
+          </div>
+
+          <div id="categories-list" class="categories" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <aside>
+        <div id="pending-panel" class="card hidden">
+          <h3>Pending approvals</h3>
+          <div id="pending-list" class="pending"></div>
+        </div>
+
+        <div id="admin-panel" class="card hidden" style="margin-top:12px">
+          <h3>Admin: Users</h3>
+          <div id="users-table-wrap"></div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <div class="muted">Tip: Bootstrap at least one <code>/user_data/{uid}</code> with role "owner" or "admin" and permission_lvl 3 in the Console to approve users.</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>Client UI enforces permissions for usability. Firestore rules must be deployed (I provided them earlier) to enforce server-side access.</footer>
   </div>
 
-  <div id="app" style="display:none;">
-    <h2>Welcome <span id="user-name"></span></h2>
-    <p>Your Role: <span id="role-label"></span> | Permission Level: <span id="perm-label"></span></p>
-    <button onclick="logout()">Logout</button>
+  <script>
+    // ------------------ Firebase compat init ------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
+      authDomain: "link-joint.firebaseapp.com",
+      projectId: "link-joint",
+      storageBucket: "link-joint.firebasestorage.app",
+      messagingSenderId: "568319687772",
+      appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
+      measurementId: "G-W88WBHPEDZ"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-    <hr>
+    // DOM refs
+    const signedOutUI = document.getElementById('signed-out-ui');
+    const signedInUI = document.getElementById('signed-in-ui');
+    const userDisplay = document.getElementById('user-display');
+    const userRoleDisplay = document.getElementById('user-role-display');
+    const authMsg = document.getElementById('auth-msg');
 
-    <h2>Categories</h2>
-    <div id="category-create" style="display:none;">
-      <input id="new-category-name" placeholder="Category Name" />
-      <button onclick="createCategory()">Create Category</button>
-    </div>
-    <div id="categories-list"></div>
+    const linksPanel = document.getElementById('links-panel');
+    const createLinkForm = document.getElementById('create-link-form');
+    const linkTitleInput = document.getElementById('link-title');
+    const linkUrlInput = document.getElementById('link-url');
+    const linkCategorySelect = document.getElementById('link-category-select');
+    const btnCreateLink = document.getElementById('btn-create-link');
+    const linksList = document.getElementById('links-list');
+    const permissionHint = document.getElementById('permission-hint');
+    const permBadge = document.getElementById('perm-badge');
 
-    <hr>
+    const categoriesPanel = document.getElementById('categories-panel');
+    const createCategoryForm = document.getElementById('create-category-form');
+    const categoryNameInput = document.getElementById('category-name');
+    const btnCreateCategory = document.getElementById('btn-create-category');
+    const categoriesList = document.getElementById('categories-list');
 
-    <h2>Links</h2>
-    <div id="link-create" style="display:none;">
-      <input id="new-link-title" placeholder="Link Title" />
-      <input id="new-link-url" placeholder="https://example.com" />
-      <select id="new-link-category"></select>
-      <button onclick="createLink()">Add Link</button>
-    </div>
-    <div id="links-list"></div>
+    const pendingPanel = document.getElementById('pending-panel');
+    const pendingList = document.getElementById('pending-list');
 
-    <hr>
+    const adminPanel = document.getElementById('admin-panel');
+    const usersTableWrap = document.getElementById('users-table-wrap');
 
-    <div id="admin-panel" style="display:none;">
-      <h2>Admin Panel: Manage Users</h2>
-      <div id="users-list"></div>
-    </div>
-  </div>
-</div>
+    const btnSignup = document.getElementById('btn-signup');
+    const btnSignin = document.getElementById('btn-signin');
+    const btnLogout = document.getElementById('btn-logout');
 
-<script>
-// Firebase Compat Init
-const firebaseConfig = {
-  apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
-  authDomain: "link-joint.firebaseapp.com",
-  projectId: "link-joint",
-  storageBucket: "link-joint.firebasestorage.app",
-  messagingSenderId: "568319687772",
-  appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
-  measurementId: "G-W88WBHPEDZ"
-};
+    // state
+    let currentUser = null;
+    let currentUserData = null;
+    let linksUnsub = null;
+    let categoriesUnsub = null;
+    let pendingUnsub = null;
+    let usersUnsub = null;
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+    function usernameToEmail(u){ return (u.trim() + '@website.com').toLowerCase(); }
+    function showMsg(m, isErr=false){ authMsg.textContent = m; authMsg.style.color = isErr ? '#ffb4b4' : '#aab6ff'; setTimeout(()=>{ if(authMsg.textContent===m) authMsg.textContent=''; },6000); }
+    function el(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
 
-let currentUser = null;
-let currentData = null;
+    // auth actions
+    btnSignup.addEventListener('click', async ()=>{
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      if(!u||!p){ showMsg('Provide username & password', true); return; }
+      const email = usernameToEmail(u);
+      try{
+        const cred = await auth.createUserWithEmailAndPassword(email,p);
+        // create pending_users doc for approval flow
+        await db.collection('pending_users').doc(cred.user.uid).set({ uid: cred.user.uid, email: cred.user.email, displayName: u, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        showMsg('Account created — waiting for admin approval');
+      }catch(e){ console.error(e); showMsg('Signup error: '+e.message, true); }
+    });
 
-function emailFromUser(u){ return u + "@website.com"; }
+    btnSignin.addEventListener('click', async ()=>{
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      if(!u||!p){ showMsg('Provide username & password', true); return; }
+      const email = usernameToEmail(u);
+      try{ await auth.signInWithEmailAndPassword(email,p); showMsg('Signed in'); }
+      catch(e){ console.error(e); showMsg('Sign-in error: '+e.message, true); }
+    });
 
-async function register(){
-  const u = username.value.trim();
-  const p = password.value;
-  if(!u||!p) return authMsg("Enter username & password");
-  try{
-    const cred = await auth.createUserWithEmailAndPassword(emailFromUser(u), p);
-    await db.collection("user_data").doc(cred.user.uid).set({username:u, role:"unapproved", permission_lvl:0});
-    authMsg("Account created. Await approval.");
-  }catch(e){ authMsg(e.message); }
-}
+    btnLogout.addEventListener('click', async ()=>{ await auth.signOut(); location.reload(); });
 
-async function login(){
-  const u = username.value.trim();
-  const p = password.value;
-  if(!u||!p) return authMsg("Enter username & password");
-  try{ await auth.signInWithEmailAndPassword(emailFromUser(u), p); }
-  catch(e){ authMsg(e.message); }
-}
+    // auth state listener
+    auth.onAuthStateChanged(async (user)=>{
+      // clean up listeners
+      if(linksUnsub){ linksUnsub(); linksUnsub = null; }
+      if(categoriesUnsub){ categoriesUnsub(); categoriesUnsub = null; }
+      if(pendingUnsub){ pendingUnsub(); pendingUnsub = null; }
+      if(usersUnsub){ usersUnsub(); usersUnsub = null; }
 
-function authMsg(m){ document.getElementById("auth-msg").innerText = m; }
+      currentUser = user;
+      if(!user){ signedOutUI.classList.remove('hidden'); signedInUI.classList.add('hidden'); linksPanel.classList.add('hidden'); categoriesPanel.classList.add('hidden'); pendingPanel.classList.add('hidden'); adminPanel.classList.add('hidden'); return; }
 
-auth.onAuthStateChanged(async(user)=>{
-  if(!user){ document.getElementById("app").style.display="none"; return; }
-  currentUser = user;
-  const snap = await db.collection("user_data").doc(user.uid).get();
-  if(!snap.exists){ authMsg("No user data."); return; }
+      signedOutUI.classList.add('hidden'); signedInUI.classList.remove('hidden'); userDisplay.textContent = user.email;
 
-  currentData = snap.data();
-  if(currentData.permission_lvl === 0){ authMsg("Awaiting approval."); logout(); return; }
+      // check user_data (approved) first
+      const udSnap = await db.collection('user_data').doc(user.uid).get();
+      if(udSnap.exists){ currentUserData = udSnap.data(); }
+      else {
+        // if not approved, check pending_users - show pending status
+        const pSnap = await db.collection('pending_users').doc(user.uid).get();
+        if(pSnap.exists()){ currentUserData = { role:'unapproved', permission_lvl:0 }; showMsg('Account pending approval — limited access'); }
+        else { currentUserData = { role:'unapproved', permission_lvl:0 }; showMsg('No account data found. Contact admin.'); }
+      }
 
-  document.getElementById("auth-section").style.display="none";
-  document.getElementById("app").style.display="block";
-  userName.innerText = currentData.username;
-  roleLabel.innerText = currentData.role;
-  permLabel.innerText = currentData.permission_lvl;
+      userRoleDisplay.textContent = `role: ${currentUserData.role} — perm: ${currentUserData.permission_lvl}`;
 
-  loadCategories();
-  loadLinks();
-  if(currentData.permission_lvl>=2) linkCreate.style.display="block";
-  if(currentData.permission_lvl>=2) categoryCreate.style.display="block";
-  if(currentData.role==="admin") adminPanel.style.display="block", loadAllUsers();
-});
+      // render UI based on perms
+      renderUIForPermissions();
 
-function logout(){ auth.signOut(); location.reload(); }
+      // live subscriptions
+      subscribeCategories();
+      if(currentUserData.permission_lvl >= 1) subscribeLinks();
+      if(currentUserData.role === 'admin' || currentUserData.role === 'owner'){
+        subscribePending();
+        subscribeUsers();
+      }
+    });
 
-// CATEGORY FUNCTIONS
-async function loadCategories(){
-  const list = document.getElementById("categories-list");
-  list.innerHTML = "";
-  const sel = document.getElementById("new-link-category");
-  sel.innerHTML = '<option value="none">Unsorted</option>';
-  const snap = await db.collection("categories").get();
+    // ---------------- Links ----------------
+    function subscribeLinks(){
+      linksPanel.classList.remove('hidden');
+      permissionHint.textContent = '';
+      permBadge.textContent = 'perm ' + (currentUserData.permission_lvl || 0);
+      linksUnsub = db.collection('links').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+        linksList.innerHTML = '';
+        if(snapshot.empty){ linksList.innerHTML = '<div class="muted">No links yet.</div>'; return; }
+        snapshot.forEach(doc=>{
+          const d = doc.data();
+          const item = document.createElement('div'); item.className='item';
+          const left = document.createElement('div'); left.style.flex='1';
+          left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.title)}</div><div class="muted"><a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">${escapeHtml(d.url)}</a></div><div class="muted">Category: ${escapeHtml(d.category||'none')}</div>`;
+          const actions = document.createElement('div'); actions.className='row';
 
-  snap.forEach(doc=>{
-    const c = doc.data();
-    sel.innerHTML += `<option value="${doc.id}">${c.name}</option>`;
-    let html = `<div class='card'><b>${c.name}</b>`;
+          const pl = currentUserData.permission_lvl || 0;
+          const isCreator = (currentUser && d.creator === currentUser.uid);
 
-    if(currentData.permission_lvl===2 && c.creator===currentUser.uid){
-      html += ` <button onclick='deleteCategory("${doc.id}")'>Delete</button>`;
+          if(pl >= 3){ const edit = document.createElement('button'); edit.className='ghost'; edit.textContent='Edit'; edit.addEventListener('click', ()=> editLink(doc.id, d)); actions.appendChild(edit); }
+          if((pl >= 3) || (pl >= 2 && isCreator)){ const del = document.createElement('button'); del.className='danger'; del.textContent='Delete'; del.addEventListener('click', async ()=>{ if(!confirm('Delete link?')) return; try{ await db.collection('links').doc(doc.id).delete(); showMsg('Link deleted'); }catch(e){ showMsg('Delete failed: '+e.message,true); } }); actions.appendChild(del); }
+
+          item.appendChild(left); item.appendChild(actions); linksList.appendChild(item);
+        });
+      }, err=>{ console.error(err); showMsg('Links error: '+err.message,true); });
     }
-    if(currentData.permission_lvl===3){
-      html += ` <button onclick='deleteCategory("${doc.id}")'>Delete</button>`;
+
+    async function createLink(){
+      if(!currentUser) return showMsg('Not signed in', true);
+      if((currentUserData.permission_lvl||0) < 2) return showMsg('Insufficient permission to create links', true);
+      const title = linkTitleInput.value.trim(); const url = linkUrlInput.value.trim(); const cat = linkCategorySelect.value || 'none';
+      if(!title||!url) return showMsg('Provide title and url', true);
+      try{ await db.collection('links').add({ title, url, category: cat, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); linkTitleInput.value=''; linkUrlInput.value=''; showMsg('Link created'); }catch(e){ console.error(e); showMsg('Create failed: '+e.message,true); }
     }
-    html += "</div>";
-    list.innerHTML += html;
-  });
-}
 
-async function createCategory(){
-  const name = newCategoryName.value.trim(); if(!name) return;
-  await db.collection("categories").add({name, creator:currentUser.uid});
-  newCategoryName.value="";
-  loadCategories();
-}
+    async function editLink(id, data){
+      if((currentUserData.permission_lvl||0) < 3) return showMsg('Insufficient permission to edit links', true);
+      const newTitle = prompt('Title', data.title); if(newTitle === null) return; const newUrl = prompt('URL', data.url); if(newUrl === null) return; const newCat = prompt('Category (use id or name)', data.category||'none'); if(newCat === null) return;
+      try{ await db.collection('links').doc(id).update({ title: newTitle, url: newUrl, category: newCat }); showMsg('Link updated'); }catch(e){ showMsg('Update failed: '+e.message,true); }
+    }
 
-async function deleteCategory(id){
-  await db.collection("categories").doc(id).delete();
-  loadCategories();
-}
+    // ---------------- Categories ----------------
+    function subscribeCategories(){
+      categoriesPanel.classList.remove('hidden');
+      categoriesUnsub = db.collection('categories').orderBy('name').onSnapshot(snapshot=>{
+        categoriesList.innerHTML=''; linkCategorySelect.innerHTML = '<option value="none">Unsorted</option>';
+        if(snapshot.empty){ categoriesList.innerHTML = '<div class="muted">No categories yet.</div>'; return; }
+        snapshot.forEach(doc=>{
+          const c = doc.data(); const id = doc.id;
+          linkCategorySelect.innerHTML += `<option value="${escapeHtml(id)}">${escapeHtml(c.name)}</option>`;
 
-// LINK FUNCTIONS
-async function loadLinks(){
-  const list = document.getElementById("links-list");
-  list.innerHTML = "";
-  const snap = await db.collection("links").get();
-  snap.forEach(doc=>{
-    const d = doc.data();
-    let html = `<div class='card'><b>${d.title}</b><br><a href='${d.url}' target='_blank'>${d.url}</a><br>`;
-    html += `<span class='category-label'>Category: ${d.category||"none"}</span><br>`;
+          const item = document.createElement('div'); item.className='item';
+          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(c.name)}</div><div class="muted">created by: ${escapeHtml(c.creator||'')}</div>`;
+          const actions = document.createElement('div'); actions.className='row';
 
-    if(currentData.permission_lvl===3){ html+=`<button onclick='deleteLink("${doc.id}")'>Delete</button>`; }
-    else if(currentData.permission_lvl===2 && d.creator===currentUser.uid){ html+=`<button onclick='deleteLink("${doc.id}")'>Delete</button>`; }
+          const pl = currentUserData.permission_lvl || 0;
+          const isCreator = (currentUser && c.creator === currentUser.uid);
 
-    html += "</div>";
-    list.innerHTML += html;
-  });
-}
+          if((pl >= 3) || (pl >=2 && isCreator)){ const del = document.createElement('button'); del.className='danger'; del.textContent='Delete'; del.addEventListener('click', async ()=>{ if(!confirm('Delete category?')) return; try{ await db.collection('categories').doc(id).delete(); showMsg('Category deleted'); }catch(e){ showMsg('Delete failed: '+e.message,true); } }); actions.appendChild(del); }
 
-async function createLink(){
-  const title = newLinkTitle.value.trim();
-  const url = newLinkUrl.value.trim();
-  const cat = newLinkCategory.value;
-  if(!title||!url) return;
-  await db.collection("links").add({title, url, category:cat, creator:currentUser.uid});
-  newLinkTitle.value=""; newLinkUrl.value="";
-  loadLinks();
-}
+          item.appendChild(left); item.appendChild(actions); categoriesList.appendChild(item);
+        });
+      }, err=>{ console.error(err); showMsg('Categories error: '+err.message,true); });
+    }
 
-async function deleteLink
+    async function createCategory(){
+      if(!currentUser) return showMsg('Not signed in', true);
+      if((currentUserData.permission_lvl||0) < 2) return showMsg('Insufficient permission to create categories', true);
+      const name = categoryNameInput.value.trim(); if(!name) return showMsg('Provide category name', true);
+      try{ await db.collection('categories').add({ name, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); categoryNameInput.value=''; showMsg('Category created'); }catch(e){ showMsg('Create failed: '+e.message,true); }
+    }
+
+    // ---------------- Pending (admin) ----------------
+    function subscribePending(){
+      pendingPanel.classList.remove('hidden');
+      pendingUnsub = db.collection('pending_users').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+        pendingList.innerHTML=''; if(snapshot.empty){ pendingList.innerHTML = '<div class="muted">No pending users.</div>'; return; }
+        snapshot.forEach(doc=>{
+          const d = doc.data(); const uid = doc.id;
+          const card = document.createElement('div'); card.className='item';
+          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.displayName||d.email)}</div><div class="muted">${escapeHtml(d.email)}</div>`;
+          const actions = document.createElement('div'); actions.className='row';
+
+          const roleSel = document.createElement('select'); ['user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; roleSel.appendChild(o); });
+          const permInput = document.createElement('input'); permInput.type='number'; permInput.min=0; permInput.max=3; permInput.value=1; permInput.style.width='72px';
+          const approveBtn = document.createElement('button'); approveBtn.className='ghost'; approveBtn.textContent='Approve';
+          const rejectBtn = document.createElement('button'); rejectBtn.className='danger'; rejectBtn.textContent='Reject';
+
+          approveBtn.addEventListener('click', async ()=>{
+            const role = roleSel.value; const perm = parseInt(permInput.value,10)||0; if(!confirm(`Approve ${d.displayName||d.email} as ${role} (perm ${perm})?`)) return;
+            try{
+              await db.collection('user_data').doc(uid).set({ role, permission_lvl: perm, displayName: d.displayName||'', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+              await db.collection('pending_users').doc(uid).delete();
+              showMsg('User approved');
+            }catch(e){ showMsg('Approve failed: '+e.message,true); }
+          });
+
+          rejectBtn.addEventListener('click', async ()=>{
+            if(!confirm(`Reject ${d.displayName||d.email}? This will only remove pending entry.`)) return;
+            try{ await db.collection('pending_users').doc(uid).delete(); showMsg('Pending removed'); }catch(e){ showMsg('Reject failed: '+e.message,true); }
+          });
+
+          actions.appendChild(roleSel); actions.appendChild(permInput); actions.appendChild(approveBtn); actions.appendChild(rejectBtn);
+          card.appendChild(left); card.appendChild(actions); pendingList.appendChild(card);
+        });
+      }, err=>{ console.error(err); showMsg('Pending listener error: '+err.message,true); });
+    }
+
+    // ---------------- Admin users ----------------
+    function subscribeUsers(){
+      adminPanel.classList.remove('hidden');
+      usersUnsub = db.collection('user_data').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+        usersTableWrap.innerHTML=''; if(snapshot.empty){ usersTableWrap.innerHTML='<div class="muted">No users</div>'; return; }
+        const table = document.createElement('div'); table.style.display='grid'; table.style.gap='8px';
+        snapshot.forEach(doc=>{
+          const u = doc.data(); const uid = doc.id;
+          const row = document.createElement('div'); row.className='item';
+          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(u.displayName||'')}</div><div class="muted">${escapeHtml(uid)}</div>`;
+          const actions = document.createElement('div'); actions.className='row';
+          const roleSel = document.createElement('select'); ['unapproved','user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; if(u.role===r) o.selected=true; roleSel.appendChild(o); });
+          const permSel = document.createElement('select'); [0,1,2,3].forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; if(u.permission_lvl===n) o.selected=true; permSel.appendChild(o); });
+          const saveBtn = document.createElement('button'); saveBtn.className='ghost'; saveBtn.textContent='Save';
+          saveBtn.addEventListener('click', async ()=>{ try{ await db.collection('user_data').doc(uid).update({ role: roleSel.value, permission_lvl: parseInt(permSel.value,10) }); showMsg('User updated'); }catch(e){ showMsg('Update failed: '+e.message,true); } });
+          actions.appendChild(roleSel); actions.appendChild(permSel); actions.appendChild(saveBtn);
+          row.appendChild(left); row.appendChild(actions); table.appendChild(row);
+        });
+        usersTableWrap.appendChild(table);
+      }, err=>{ console.error(err); showMsg('Users listener error: '+err.message,true); });
+    }
+
+    // ---------------- Helpers ----------------
+    function renderUIForPermissions(){
+      const pl = currentUserData.permission_lvl || 0;
+      if(pl >= 1){ linksPanel.classList.remove('hidden'); }
+      else { linksPanel.classList.add('hidden'); permissionHint.textContent = 'No view permission'; }
+      if(pl >= 2){ createLinkForm.classList.remove('hidden'); createCategoryForm.classList.remove('hidden'); }
+      else { createLinkForm.classList.add('hidden'); createCategoryForm.classList.add('hidden'); }
+      if(pl >= 1){ categoriesPanel.classList.remove('hidden'); }
+      else { categoriesPanel.classList.add('hidden'); }
+    }
+
+    function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;"); }
+
+    // Attach create handlers
+    btnCreateLink.addEventListener('click', createLink);
+    btnCreateCategory.addEventListener('click', createCategory);
+
+    // quick subscribe to categories on load even if not yet approved (so select populates)
+    function init(){ subscribeCategories(); }
+    init();
+  </script>
+</body>
+</html>
