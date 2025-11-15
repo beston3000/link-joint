@@ -1,570 +1,286 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Link Joint — Full (Pending Approval)</title>
-  <style>
-    body { font-family: system-ui,Segoe UI,Roboto,Arial; margin: 0; padding: 20px; background:#f6f8fa; color:#111; }
-    header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
-    .card { background:#fff; border-radius:10px; padding:16px; box-shadow: 0 6px 18px rgba(10,10,10,0.06); margin-bottom:16px;}
-    input, select, button, textarea { font:inherit; padding:8px; border-radius:6px; border:1px solid #dcdcdc; }
-    label { display:block; margin-top:8px; font-weight:600; }
-    .row { display:flex; gap:8px; align-items:center; }
-    .small { font-size:0.9rem; color:#555; }
-    .links { display:grid; gap:8px; }
-    .link-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border-radius:8px; border:1px solid #eee; }
-    .btn { cursor:pointer; background:#0366d6; color:white; padding:8px 12px; border-radius:8px; border:none; }
-    .btn.ghost { background:transparent; color:#0366d6; border:1px solid #0366d6; }
-    .danger { background:#e55353; color:white; border:none; }
-    .muted { color:#666; font-size:0.9rem; }
-    table { width:100%; border-collapse:collapse; margin-top:8px; }
-    th, td { text-align:left; padding:8px; border-bottom:1px solid #eee; }
-    .actions { display:flex; gap:6px; }
-    .hidden { display:none; }
-    footer { margin-top:20px; font-size:0.85rem; color:#666; }
-    select.smallsel { padding:6px; border-radius:6px; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:12px; background:#eef; color:#0366d6; font-weight:600; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Link Joint</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #0f1116;
+  color: #e5e5e5;
+}
+header {
+  background: #1a1d24;
+  padding: 20px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+  border-bottom: 1px solid #333;
+}
+.container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  background: #1a1d24;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.4);
+}
+input, select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #0f1116;
+  color: #fff;
+}
+button {
+  padding: 10px 16px;
+  border: none;
+  background: #3b82f6;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+  margin-right: 5px;
+}
+button:hover {
+  background: #60a5fa;
+}
+.card {
+  background: #242832;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #333;
+}
+.category-label {
+  font-size: 13px;
+  color: #9ca3af;
+}
+.flex {
+  display: flex;
+  gap: 10px;
+}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Link Joint</h1>
-    <div id="auth-area" class="card" style="min-width:320px;">
-      <div id="signed-out-ui">
-        <div><strong>Sign in / Sign up</strong></div>
-        <div class="small">Enter a username (like <code>eeeee24</code>) and password. It becomes <code>username@website.com</code>.</div>
+<header>Link Joint</header>
+<div class="container">
+  <div id="auth-section">
+    <h2>Login / Register</h2>
+    <input id="username" placeholder="Username (no email needed)" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+    <p id="auth-msg"></p>
+  </div>
 
-        <label>Username</label>
-        <input id="username" placeholder="username (no @)" autocomplete="username" />
+  <div id="app" style="display:none;">
+    <h2>Welcome <span id="user-name"></span></h2>
+    <p>Your Role: <span id="role-label"></span> | Permission Level: <span id="perm-label"></span></p>
+    <button onclick="logout()">Logout</button>
 
-        <label>Password</label>
-        <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+    <hr>
 
-        <div style="margin-top:8px;" class="row">
-          <button id="btn-signup" class="btn">Create account</button>
-          <button id="btn-signin" class="btn ghost">Sign in</button>
-        </div>
-        <div id="auth-msg" class="muted" style="margin-top:8px;"></div>
-      </div>
-
-      <div id="signed-in-ui" class="hidden">
-        <div><strong id="user-display">Signed in</strong></div>
-        <div class="small" id="user-role-display"></div>
-        <div style="margin-top:8px;" class="row">
-          <button id="btn-logout" class="btn ghost">Sign out</button>
-        </div>
-      </div>
+    <!-- CATEGORY MANAGEMENT -->
+    <h2>Categories</h2>
+    <div id="category-create" style="display:none;">
+      <input id="new-category-name" placeholder="Category Name" />
+      <button onclick="createCategory()">Create Category</button>
     </div>
-  </header>
+    <div id="categories-list"></div>
 
-  <main>
-    <!-- Pending (Admin) -->
-    <section id="pending-panel" class="card hidden">
-      <h2>Pending Approvals</h2>
-      <div class="small">New signups appear here. Approve to create a <code>user_data</code> doc for them.</div>
-      <div id="pending-list" style="margin-top:12px;"></div>
-    </section>
+    <hr>
 
-    <!-- Admin: Manage Users -->
-    <section id="admin-panel" class="card hidden">
-      <h2>Admin: Manage Users</h2>
-      <div class="small">Admins can edit roles & permission levels.</div>
-      <div id="users-table-wrap" style="margin-top:12px;"></div>
-    </section>
+    <!-- LINK MANAGEMENT -->
+    <h2>Links</h2>
+    <div id="link-create" style="display:none;">
+      <input id="new-link-title" placeholder="Link Title" />
+      <input id="new-link-url" placeholder="https://example.com" />
+      <select id="new-link-category"></select>
+      <button onclick="createLink()">Add Link</button>
+    </div>
+    <div id="links-list"></div>
 
-    <!-- Links -->
-    <section id="links-panel" class="card hidden">
-      <h2>Links <span id="perm-badge" class="badge"></span></h2>
-      <div id="permission-hint" class="small muted" style="margin-bottom:8px;"></div>
+    <hr>
 
-      <div id="create-link-form" class="hidden" style="margin-bottom:12px;">
-        <label>Title</label>
-        <input id="link-title" placeholder="Link title" />
-        <label>URL</label>
-        <input id="link-url" placeholder="https://example.com" />
-        <div style="margin-top:8px;" class="row">
-          <button id="btn-create-link" class="btn">Create link</button>
-        </div>
-      </div>
+    <!-- ADMIN PANEL -->
+    <div id="admin-panel" style="display:none;">
+      <h2>Admin Panel: Manage Users</h2>
+      <div id="users-list"></div>
+    </div>
+  </div>
+</div>
 
-      <div id="links-list" class="links"></div>
-    </section>
-  </main>
+<script>
+// Firebase init\const firebaseConfig = {
+  apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
+  authDomain: "link-joint.firebaseapp.com",
+  projectId: "link-joint",
+  storageBucket: "link-joint.firebasestorage.app",
+  messagingSenderId: "568319687772",
+  appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
+  measurementId: "G-W88WBHPEDZ"
+};
 
-  <footer>
-    <div class="small">Server-side security is enforced via Firestore Rules (see below). You still need to bootstrap an admin/owner account manually once.</div>
-  </footer>
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-  <!-- Firebase modular SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import {
-      getAuth,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
-      signOut,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+let currentUser = null;
+let currentData = null;
 
-    import {
-      getFirestore,
-      doc,
-      setDoc,
-      getDoc,
-      updateDoc,
-      collection,
-      addDoc,
-      query,
-      onSnapshot,
-      orderBy,
-      where,
-      getDocs,
-      deleteDoc,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+function emailFromUser(u){return u+"@website.com";}
 
-    // ---- Insert your firebase config here (you provided earlier) ----
-    const firebaseConfig = {
-      apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
-      authDomain: "link-joint.firebaseapp.com",
-      projectId: "link-joint",
-      storageBucket: "link-joint.firebasestorage.app",
-      messagingSenderId: "568319687772",
-      appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
-      measurementId: "G-W88WBHPEDZ"
-    };
+async function register(){
+  const u = username.value.trim();
+  const p = password.value;
+  if(!u||!p) return authMsg("Enter username & password");
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(emailFromUser(u), p);
+    await db.collection("user_data").doc(cred.user.uid).set({username:u, role:"unapproved", permission_lvl:0});
+    authMsg("Account created. Await approval.");
+  }catch(e){authMsg(e.message);} }
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+async function login(){
+  const u = username.value.trim();
+  const p = password.value;
+  if(!u||!p) return authMsg("Enter username & password");
+  try{await auth.signInWithEmailAndPassword(emailFromUser(u), p);}catch(e){authMsg(e.message);} }
 
-    // ---- DOM refs ----
-    const usernameInput = document.getElementById('username');
-    const passwordInput = document.getElementById('password');
-    const btnSignup = document.getElementById('btn-signup');
-    const btnSignin = document.getElementById('btn-signin');
-    const btnLogout = document.getElementById('btn-logout');
-    const authMsg = document.getElementById('auth-msg');
+function authMsg(m){document.getElementById("auth-msg").innerText = m;}
 
-    const signedOutUI = document.getElementById('signed-out-ui');
-    const signedInUI = document.getElementById('signed-in-ui');
-    const userDisplay = document.getElementById('user-display');
-    const userRoleDisplay = document.getElementById('user-role-display');
+auth.onAuthStateChanged(async(user)=>{
+  if(!user){document.getElementById("app").style.display="none";return;}
+  currentUser = user;
+  const snap = await db.collection("user_data").doc(user.uid).get();
+  if(!snap.exists){authMsg("No user data."); return;}
 
-    const adminPanel = document.getElementById('admin-panel');
-    const usersTableWrap = document.getElementById('users-table-wrap');
+  currentData = snap.data();
+  if(currentData.permission_lvl===0){authMsg("Awaiting approval."); logout(); return;}
 
-    const pendingPanel = document.getElementById('pending-panel');
-    const pendingList = document.getElementById('pending-list');
+  document.getElementById("auth-section").style.display="none";
+  document.getElementById("app").style.display="block";
+  userName.innerText = currentData.username;
+  roleLabel.innerText = currentData.role;
+  permLabel.innerText = currentData.permission_lvl;
 
-    const linksPanel = document.getElementById('links-panel');
-    const createLinkForm = document.getElementById('create-link-form');
-    const linkTitleInput = document.getElementById('link-title');
-    const linkUrlInput = document.getElementById('link-url');
-    const btnCreateLink = document.getElementById('btn-create-link');
-    const linksList = document.getElementById('links-list');
-    const permissionHint = document.getElementById('permission-hint');
-    const permBadge = document.getElementById('perm-badge');
+  loadCategories();
+  loadLinks();
+  if(currentData.permission_lvl>=2) linkCreate.style.display="block";
+  if(currentData.permission_lvl>=2) categoryCreate.style.display="block";
+  if(currentData.role==="admin") adminPanel.style.display="block", loadAllUsers();
+});
 
-    // ---- Helpers ----
-    function usernameToEmail(u) {
-      return (u.trim() + "@website.com").toLowerCase();
+function logout(){auth.signOut(); location.reload();}
+
+// CATEGORY FUNCTIONS
+async function loadCategories(){
+  const list = document.getElementById("categories-list");
+  list.innerHTML = "";
+  const sel = document.getElementById("new-link-category");
+  sel.innerHTML = '<option value="none">Unsorted</option>';
+  const snap = await db.collection("categories").get();
+
+  snap.forEach(doc=>{
+    const c = doc.data();
+    sel.innerHTML += `<option value="${doc.id}">${c.name}</option>`;
+
+    let html = `<div class='card'><b>${c.name}</b>`;
+
+    if(currentData.permission_lvl===2 && c.creator===currentUser.uid){
+      html += ` <button onclick='deleteCategory("${doc.id}")'>Delete</button>`;
     }
-    function showMsg(msg, isError = false) {
-      authMsg.textContent = msg;
-      authMsg.style.color = isError ? '#b00020' : '#666';
-      setTimeout(() => { if (authMsg.textContent === msg) authMsg.textContent = ''; }, 6000);
+    if(currentData.permission_lvl===3){
+      html += ` <button onclick='deleteCategory("${doc.id}")'>Delete</button>`;
     }
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
+    html += "</div>";
+    list.innerHTML += html;
+  });
+}
 
-    // ---- Signup (creates Auth user and pending_users doc) ----
-    btnSignup.addEventListener('click', async () => {
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value;
-      if (!username || !password) { showMsg('Provide username and password', true); return; }
-      const email = usernameToEmail(username);
-      try {
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCred.user;
-        // Create pending_users doc for admin approval
-        await setDoc(doc(db, 'pending_users', user.uid), {
-          uid: user.uid,
-          email: user.email,
-          displayName: username,
-          createdAt: serverTimestamp()
-        });
-        showMsg('Account created. Waiting for admin approval.');
-      } catch (err) {
-        console.error(err);
-        showMsg('Signup error: ' + err.message, true);
-      }
-    });
+async function createCategory(){
+  const name = newCategoryName.value.trim(); if(!name) return;
+  await db.collection("categories").add({name, creator:currentUser.uid});
+  newCategoryName.value="";
+  loadCategories();
+}
 
-    // ---- Sign in ----
-    btnSignin.addEventListener('click', async () => {
-      const username = usernameInput.value.trim();
-      const password = passwordInput.value;
-      if (!username || !password) { showMsg('Provide username and password', true); return; }
-      const email = usernameToEmail(username);
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        showMsg('Signed in');
-      } catch (err) {
-        console.error(err);
-        showMsg('Sign-in error: ' + err.message, true);
-      }
-    });
+async function deleteCategory(id){
+  await db.collection("categories").doc(id).delete();
+  loadCategories();
+}
 
-    // ---- Sign out ----
-    btnLogout.addEventListener('click', async () => {
-      await signOut(auth);
-      showMsg('Signed out');
-    });
+// LINK FUNCTIONS
+async function loadLinks(){
+  const list = document.getElementById("links-list");
+  list.innerHTML = "";
+  const snap = await db.collection("links").get();
+  snap.forEach(doc=>{
+    const d = doc.data();
+    let html = `<div class='card'><b>${d.title}</b><br><a href='${d.url}' target='_blank'>${d.url}</a><br>`;
+    html += `<span class='category-label'>Category: ${d.category||"none"}</span><br>`;
 
-    // ---- State & listeners ----
-    let currentUserData = null;
-    let linksUnsub = null;
-    let usersUnsub = null;
-    let pendingUnsub = null;
+    if(currentData.permission_lvl===3){ html+=`<button onclick='deleteLink("${doc.id}")'>Delete</button>`; }
+    else if(currentData.permission_lvl===2 && d.creator===currentUser.uid){ html+=`<button onclick='deleteLink("${doc.id}")'>Delete</button>`; }
 
-    onAuthStateChanged(auth, async (user) => {
-      // cleanup
-      if (linksUnsub) { linksUnsub(); linksUnsub = null; }
-      if (usersUnsub) { usersUnsub(); usersUnsub = null; }
-      if (pendingUnsub) { pendingUnsub(); pendingUnsub = null; }
+    html += "</div>";
+    list.innerHTML += html;
+  });
+}
 
-      if (user) {
-        signedOutUI.classList.add('hidden');
-        signedInUI.classList.remove('hidden');
-        userDisplay.textContent = `Signed in: ${user.email} (uid: ${user.uid})`;
+async function createLink(){
+  const title = newLinkTitle.value.trim();
+  const url = newLinkUrl.value.trim();
+  const cat = newLinkCategory.value;
+  if(!title||!url) return;
+  await db.collection("links").add({title, url, category:cat, creator:currentUser.uid});
+  newLinkTitle.value=""; newLinkUrl.value="";
+  loadLinks();
+}
 
-        // Check if user has a user_data doc (approved)
-        const udSnap = await getDoc(doc(db, 'user_data', user.uid));
-        if (udSnap.exists()) {
-          currentUserData = udSnap.data();
-          userRoleDisplay.textContent = `role: ${currentUserData.role} — permission_lvl: ${currentUserData.permission_lvl}`;
-          renderUIForPermissions(user, currentUserData);
-          // Admins subscribe to pending and users
-          if (currentUserData.role === 'admin' || currentUserData.role === 'owner') {
-            subscribeToPending();
-            subscribeToAllUsers();
-          }
-        } else {
-          // not approved (no user_data). Check pending_users doc to show status.
-          const puSnap = await getDoc(doc(db, 'pending_users', user.uid));
-          if (puSnap.exists()) {
-            signedInUI.classList.remove('hidden');
-            userRoleDisplay.textContent = `Status: Pending approval`;
-            // Show restricted UI
-            currentUserData = { role: 'unapproved', permission_lvl: 0 };
-            renderUIForPermissions(user, currentUserData);
-          } else {
-            // No pending doc and no user_data (rare). Prompt user to re-signup or contact admin.
-            userRoleDisplay.textContent = `No account data found. Contact admin.`;
-            currentUserData = { role: 'unapproved', permission_lvl: 0 };
-            renderUIForPermissions(user, currentUserData);
-          }
-        }
-      } else {
-        signedOutUI.classList.remove('hidden');
-        signedInUI.classList.add('hidden');
-        userDisplay.textContent = 'Signed out';
-        userRoleDisplay.textContent = '';
-        linksPanel.classList.add('hidden');
-        adminPanel.classList.add('hidden');
-        pendingPanel.classList.add('hidden');
-      }
-    });
+async function deleteLink(id){
+  await db.collection("links").doc(id).delete();
+  loadLinks();
+}
 
-    // ---- Subscribe to links (if permission >=1) ----
-    function subscribeToLinks(user, userData) {
-      if (!userData || userData.permission_lvl < 1) {
-        linksPanel.classList.add('hidden');
-        permissionHint.textContent = 'You do not have permission to view links.';
-        permBadge.textContent = '';
-        return;
-      }
-      linksPanel.classList.remove('hidden');
-      permissionHint.textContent = '';
-      permBadge.textContent = 'perm: ' + userData.permission_lvl;
+// ADMIN PANEL
+async function loadAllUsers(){
+  const list = document.getElementById("users-list");
+  list.innerHTML = "";
+  const snap = await db.collection("user_data").get();
+  snap.forEach(doc=>{
+    const u = doc.data();
+    list.innerHTML += `<div class='card'>
+      <b>${u.username}</b><br>
+      Role: <select onchange='updateUser("${doc.id}", "role", this.value)'>
+        <option ${u.role=="unapproved"?"selected":""}>unapproved</option>
+        <option ${u.role=="user"?"selected":""}>user</option>
+        <option ${u.role=="admin"?"selected":""}>admin</option>
+        <option ${u.role=="owner"?"selected":""}>owner</option>
+      </select><br>
 
-      const q = query(collection(db, 'links'), orderBy('createdAt', 'desc'));
-      linksUnsub = onSnapshot(q, (snapshot) => {
-        linksList.innerHTML = '';
-        if (snapshot.empty) {
-          linksList.innerHTML = '<div class="muted">No links yet.</div>';
-          return;
-        }
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          const id = docSnap.id;
-          const title = data.title || '(no title)';
-          const url = data.url || '#';
-          const creator = data.creator || '';
-          const createdAt = data.createdAt ? new Date(data.createdAt.seconds*1000).toLocaleString() : '';
+      Permission: <select onchange='updateUser("${doc.id}", "permission_lvl", Number(this.value))'>
+        <option value="0" ${u.permission_lvl==0?"selected":""}>0</option>
+        <option value="1" ${u.permission_lvl==1?"selected":""}>1</option>
+        <option value="2" ${u.permission_lvl==2?"selected":""}>2</option>
+        <option value="3" ${u.permission_lvl==3?"selected":""}>3</option>
+      </select>
+    </div>`;
+  });
+}
 
-          const row = document.createElement('div');
-          row.className = 'link-row';
-          row.innerHTML = `
-            <div style="flex:1">
-              <div><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a></div>
-              <div class="small muted">created by: ${creator} ${createdAt ? ' · ' + createdAt : ''}</div>
-            </div>
-            <div class="actions"></div>
-          `;
-          const actions = row.querySelector('.actions');
-
-          const pl = userData.permission_lvl || 0;
-          const isCreator = (user.uid === creator);
-
-          if (pl >= 3) {
-            const btnEdit = document.createElement('button'); btnEdit.className = 'btn ghost'; btnEdit.textContent = 'Edit';
-            btnEdit.addEventListener('click', () => openEditDialog(id, data));
-            actions.appendChild(btnEdit);
-          }
-
-          if ((pl >= 3) || (pl >= 2 && isCreator)) {
-            const btnDelete = document.createElement('button'); btnDelete.className = 'danger'; btnDelete.textContent = 'Delete';
-            btnDelete.addEventListener('click', async () => {
-              if (!confirm('Delete this link?')) return;
-              try {
-                await deleteDoc(doc(db, 'links', id));
-                showMsg('Link deleted');
-              } catch (err) {
-                console.error(err);
-                showMsg('Delete error: ' + err.message, true);
-              }
-            });
-            actions.appendChild(btnDelete);
-          }
-
-          linksList.appendChild(row);
-        });
-      }, (err) => {
-        console.error(err);
-        showMsg('Links listener error: ' + err.message, true);
-      });
-    }
-
-    // ---- Create link (perm >=2) ----
-    btnCreateLink.addEventListener('click', async () => {
-      const user = auth.currentUser;
-      if (!user) { showMsg('Not signed in', true); return; }
-      const ud = currentUserData || {};
-      if (ud.permission_lvl < 2) { showMsg('Insufficient permission to create links', true); return; }
-      const title = linkTitleInput.value.trim();
-      const url = linkUrlInput.value.trim();
-      if (!title || !url) { showMsg('Provide title and url', true); return; }
-      try {
-        await addDoc(collection(db, 'links'), {
-          title,
-          url,
-          creator: user.uid,
-          createdAt: serverTimestamp()
-        });
-        linkTitleInput.value = '';
-        linkUrlInput.value = '';
-        showMsg('Link created');
-      } catch (err) {
-        console.error(err);
-        showMsg('Create link error: ' + err.message, true);
-      }
-    });
-
-    // ---- Edit dialog (perm >=3) ----
-    async function openEditDialog(linkId, data) {
-      const user = auth.currentUser;
-      const ud = currentUserData || {};
-      if (!user) return;
-      if (ud.permission_lvl < 3) { showMsg('Insufficient permission to edit links', true); return; }
-      const newTitle = prompt('Edit title', data.title || '');
-      if (newTitle === null) return;
-      const newUrl = prompt('Edit URL', data.url || '');
-      if (newUrl === null) return;
-      try {
-        await updateDoc(doc(db, 'links', linkId), { title: newTitle, url: newUrl });
-        showMsg('Link updated');
-      } catch (err) {
-        console.error(err);
-        showMsg('Update error: ' + err.message, true);
-      }
-    }
-
-    // ---- Admin: subscribe to pending users ----
-    function subscribeToPending() {
-      pendingPanel.classList.remove('hidden');
-      const q = query(collection(db, 'pending_users'), orderBy('createdAt', 'desc'));
-      pendingUnsub = onSnapshot(q, (snapshot) => {
-        pendingList.innerHTML = '';
-        if (snapshot.empty) {
-          pendingList.innerHTML = '<div class="muted">No pending users.</div>';
-          return;
-        }
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          const uid = docSnap.id;
-          const html = document.createElement('div');
-          html.className = 'card';
-          html.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div>
-                <div><strong>${escapeHtml(data.displayName || data.email)}</strong></div>
-                <div class="small muted">uid: ${uid} · email: ${escapeHtml(data.email || '')}</div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center">
-                <select class="smallsel role-select" data-uid="${uid}">
-                  <option value="user">user</option>
-                  <option value="admin">admin</option>
-                  <option value="owner">owner</option>
-                </select>
-                <input type="number" min="0" max="3" value="1" class="perm-input" data-uid="${uid}" style="width:64px" />
-                <button class="approve btn ghost" data-uid="${uid}">Approve</button>
-                <button class="reject danger" data-uid="${uid}">Reject</button>
-              </div>
-            </div>
-          `;
-          pendingList.appendChild(html);
-
-          // Attach handlers after appended
-          const approveBtn = html.querySelector('.approve');
-          const rejectBtn = html.querySelector('.reject');
-          const roleSel = html.querySelector('.role-select');
-          const permInput = html.querySelector('.perm-input');
-
-          approveBtn.addEventListener('click', async () => {
-            const role = roleSel.value;
-            const perm = parseInt(permInput.value, 10) || 0;
-            if (!confirm(`Approve ${data.displayName || data.email} as ${role} (perm ${perm})?`)) return;
-            try {
-              // Create user_data for that uid
-              await setDoc(doc(db, 'user_data', uid), {
-                role,
-                permission_lvl: perm,
-                displayName: data.displayName || '',
-                createdAt: serverTimestamp()
-              });
-              // Remove pending doc
-              await deleteDoc(doc(db, 'pending_users', uid));
-              showMsg('User approved');
-            } catch (err) {
-              console.error(err);
-              showMsg('Approve error: ' + err.message, true);
-            }
-          });
-
-          rejectBtn.addEventListener('click', async () => {
-            if (!confirm(`Reject and remove ${data.displayName || data.email} from pending?`)) return;
-            try {
-              await deleteDoc(doc(db, 'pending_users', uid));
-              showMsg('Pending user removed. Note: Auth account still exists (delete via Admin SDK if desired).');
-            } catch (err) {
-              console.error(err);
-              showMsg('Reject error: ' + err.message, true);
-            }
-          });
-
-        });
-      }, (err) => {
-        console.error(err);
-        showMsg('Pending listener error: ' + err.message, true);
-      });
-    }
-
-    // ---- Admin: subscribe to all user_data ----
-    function subscribeToAllUsers() {
-      adminPanel.classList.remove('hidden');
-      const q = query(collection(db, 'user_data'), orderBy('createdAt', 'desc'));
-      usersUnsub = onSnapshot(q, (snapshot) => {
-        renderUsersTable(snapshot.docs);
-      }, (err) => {
-        console.error(err);
-        showMsg('Users listener error: ' + err.message, true);
-      });
-    }
-
-    function renderUsersTable(userDocs) {
-      if (!userDocs || userDocs.length === 0) {
-        usersTableWrap.innerHTML = '<div class="muted">No users found.</div>';
-        return;
-      }
-      let html = '<table><thead><tr><th>UID</th><th>Display name</th><th>Role</th><th>Permission lvl</th><th>Actions</th></tr></thead><tbody>';
-      for (const udoc of userDocs) {
-        const ud = udoc.data();
-        const uid = udoc.id;
-        html += `<tr data-uid="${uid}">
-          <td style="max-width:220px; word-break:break-all">${uid}</td>
-          <td>${escapeHtml(ud.displayName || '')}</td>
-          <td>
-            <select class="role-select" data-uid="${uid}">
-              <option ${ud.role==='unapproved' ? 'selected' : ''} value="unapproved">unapproved</option>
-              <option ${ud.role==='user' ? 'selected' : ''} value="user">user</option>
-              <option ${ud.role==='admin' ? 'selected' : ''} value="admin">admin</option>
-              <option ${ud.role==='owner' ? 'selected' : ''} value="owner">owner</option>
-            </select>
-          </td>
-          <td><input type="number" class="perm-input" data-uid="${uid}" min="0" max="3" value="${ud.permission_lvl||0}" style="width:72px" /></td>
-          <td><button class="update-user btn ghost" data-uid="${uid}">Update</button></td>
-        </tr>`;
-      }
-      html += '</tbody></table>';
-      usersTableWrap.innerHTML = html;
-
-      // attach listeners to update buttons
-      const updateBtns = usersTableWrap.querySelectorAll('.update-user');
-      updateBtns.forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const uid = btn.dataset.uid;
-          const sel = usersTableWrap.querySelector(`.role-select[data-uid="${uid}"]`);
-          const permInput = usersTableWrap.querySelector(`.perm-input[data-uid="${uid}"]`);
-          const newRole = sel.value;
-          const newPerm = parseInt(permInput.value, 10) || 0;
-          try {
-            await updateDoc(doc(db, 'user_data', uid), { role: newRole, permission_lvl: newPerm });
-            showMsg('User updated');
-          } catch (err) {
-            console.error(err);
-            showMsg('Update user error: ' + err.message, true);
-          }
-        });
-      });
-    }
-
-    // ---- Render UI based on permissions ----
-    function renderUIForPermissions(user, userData) {
-      if (!userData || userData.permission_lvl < 1) {
-        linksPanel.classList.add('hidden');
-        permissionHint.textContent = 'You do not have permission to view links.';
-        permBadge.textContent = '';
-      } else {
-        subscribeToLinks(user, userData);
-      }
-
-      if (userData && userData.permission_lvl >= 2) {
-        createLinkForm.classList.remove('hidden');
-      } else {
-        createLinkForm.classList.add('hidden');
-      }
-
-      // Admin panel/pending is handled by admin subscriptions earlier.
-      if (userData && (userData.role === 'admin' || userData.role === 'owner')) {
-        // handled elsewhere
-      } else {
-        adminPanel.classList.add('hidden');
-        pendingPanel.classList.add('hidden');
-      }
-    }
-
-    // ---- Log guidance ----
-    console.log('Link Joint client loaded. Remember to bootstrap an admin/owner by creating a /user_data/{uid} document manually in the Console for the first admin.');
-  </script>
+async function updateUser(id, field, value){
+  await db.collection("user_data").doc(id).update({[field]:value});
+  loadAllUsers();
+}
+</script>
 </body>
 </html>
