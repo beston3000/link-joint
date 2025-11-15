@@ -35,7 +35,10 @@
         // Import Firebase modules using CDN URLs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, collection, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Enable debug logging for Firebase (optional but useful for error checking)
+        setLogLevel('debug');
 
         // --- PROVIDED FIREBASE CONFIGURATION ---
         const FALLBACK_FIREBASE_CONFIG = {
@@ -69,7 +72,7 @@
         let usernameInput = '';
         let passwordInput = '';
         let editingLink = null;
-        let currentView = 'library'; // New state for tabs: 'library', 'categories', 'users'
+        let currentView = 'library'; // State for tabs: 'library', 'categories', 'users'
         
         // --- Utility Functions ---
 
@@ -159,7 +162,12 @@
                 }
             } catch (error) {
                 console.error(error);
-                showMessage(`Authentication failed: ${error.message}`, false);
+                // Specific check for 'auth/email-already-in-use' which might happen due to username-to-email conversion
+                if (error.code === 'auth/email-already-in-use') {
+                     showMessage(`Authentication failed: The username '${usernameInput}' is already taken.`, false);
+                } else {
+                    showMessage(`Authentication failed: ${error.message}`, false);
+                }
             } finally {
                 setLoading(false);
             }
@@ -170,6 +178,7 @@
         const setupProfileListener = (userId) => {
             if (!db || !userId) return;
 
+            // PRIVATE COLLECTION for user-specific profiles
             const profileDocRef = doc(db, `artifacts/${appId}/users/${userId}/profiles`, 'profile');
 
             onSnapshot(profileDocRef, (docSnap) => {
@@ -194,6 +203,7 @@
         const setupLinksListener = (userId) => {
             if (!db || !userId) return;
 
+            // PRIVATE COLLECTION for user-specific links
             const linksCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/userLinks`);
             const q = query(linksCollectionRef); // No orderBy to comply with constraint
 
@@ -321,7 +331,9 @@
 
         const getCategories = () => {
             const categorySet = new Set(links.map(l => l.category).filter(c => c));
-            return ['General', 'Work', 'Personal', ...Array.from(categorySet)].sort();
+            // Ensure default categories are always included and remove duplicates
+            const allCategories = ['General', 'Work', 'Personal', ...Array.from(categorySet)];
+            return Array.from(new Set(allCategories)).sort();
         };
 
         const getTabButton = (viewName, label) => {
@@ -495,7 +507,7 @@
                     
                     <h3 class="text-xl font-bold text-white mt-8 mb-4">Requested Users (Admin View)</h3>
                     <div class="p-4 bg-yellow-900/50 border border-yellow-700 rounded-lg text-yellow-200">
-                        This view is ready for future admin features! To enable multi-user management, user profiles would need to be stored in a publicly queryable collection to list all accounts. Currently, the application only loads your private profile.
+                        This tab is ready for future multi-user features. To see a list of other users, the app would need security rule changes and a public collection to store user profiles.
                     </div>
                 </div>
             `;
@@ -510,6 +522,9 @@
             const categories = getCategories();
             const modalContainer = document.getElementById('modal-container');
 
+            // We ensure the modal is displayed *before* rendering the content to prevent flashing
+            modalContainer.style.display = 'flex'; 
+            
             modalContainer.innerHTML = `
                 <form id="edit-form" class="bg-gray-800 p-6 rounded-xl w-full max-w-lg shadow-2xl">
                     <h3 class="text-2xl font-bold text-white mb-4">Edit Link</h3>
@@ -553,7 +568,6 @@
                     </div>
                 </form>
             `;
-            modalContainer.style.display = 'flex'; // Show modal
 
             // Attach listeners for the modal
             modalContainer.querySelector('#edit-cancel-btn').onclick = () => {
@@ -586,13 +600,13 @@
         const renderApp = () => {
             const appDiv = document.getElementById('app');
 
-            if (loading && !message && !authReady) {
-                 appDiv.innerHTML = `<div class="text-white text-xl animate-pulse">Loading...</div>`;
+            if (!authReady) {
+                 appDiv.innerHTML = `<div class="text-white text-xl animate-pulse">Initializing Firebase...</div>`;
                  return;
             } 
             
-            if (!authReady || !user || user.isAnonymous) {
-                // Show Auth screen if not authenticated (logged out or anonymous session)
+            // Check if user is logged in AND is not anonymous (i.e., they used sign-up/sign-in)
+            if (!user || user.isAnonymous) {
                 renderAuthScreen();
                 return;
             }
@@ -659,7 +673,20 @@
                             editingLink = linkToModify;
                             renderEditModal();
                         } else if (action === 'delete') {
-                            handleDeleteLink(linkId);
+                            // Use custom modal instead of alert()
+                            const confirmationMessage = document.createElement('div');
+                            confirmationMessage.classList.add('bg-red-800', 'p-6', 'rounded-xl', 'shadow-2xl');
+                            confirmationMessage.innerHTML = `
+                                <h3 class="text-xl font-bold text-white mb-4">Confirm Deletion</h3>
+                                <p class="text-gray-200 mb-6">Are you sure you want to delete the link: <span class="font-semibold">${linkToModify.title}</span>?</p>
+                                <div class="flex justify-end space-x-3">
+                                    <button onclick="document.getElementById('modal-container').style.display='none';" class="py-2 px-4 rounded-lg font-semibold text-gray-300 border border-gray-600 hover:bg-gray-700 transition duration-150">Cancel</button>
+                                    <button onclick="handleDeleteLink('${linkId}'); document.getElementById('modal-container').style.display='none';" class="py-2 px-4 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 transition duration-150">Delete</button>
+                                </div>
+                            `;
+                            document.getElementById('modal-container').innerHTML = '';
+                            document.getElementById('modal-container').appendChild(confirmationMessage);
+                            document.getElementById('modal-container').style.display = 'flex';
                         }
                     });
                 }
@@ -679,24 +706,13 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // --- Initial Sign-In (Mandatory) ---
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    console.error("Initial Authentication Error:", e.message);
-                }
-
                 // --- Auth State Listener ---
-                onAuthStateChanged(auth, (currentUser) => {
+                onAuthStateChanged(auth, async (currentUser) => {
                     if (currentUser && !currentUser.isAnonymous) {
                         user = currentUser;
                         setupProfileListener(currentUser.uid);
                     } else {
-                        // User is null (signed out) OR anonymous (no profile expected).
+                        // User is signed out or currently an anonymous session.
                         user = currentUser;
                         userProfile = null;
                         links = [];
@@ -704,6 +720,21 @@
                     authReady = true;
                     renderApp();
                 });
+                
+                // --- Initial Sign-In Attempt (Only run if user is null or not ready) ---
+                if (!auth.currentUser) {
+                    try {
+                         // Prefer initial token, fallback to anonymous sign-in
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) {
+                         // This catches the 'admin-restricted-operation' error gracefully
+                        console.warn("Initial Authentication Skip (Expected if already authenticated):", e.message);
+                    }
+                }
 
             } catch (e) {
                 console.error("Firebase initialization failed:", e);
@@ -718,6 +749,7 @@
         window.setUsername = setUsername;
         window.setPassword = setPassword;
         window.setView = setView;
+        window.handleDeleteLink = handleDeleteLink; // Expose for the custom confirmation modal
     </script>
 </body>
 </html>
