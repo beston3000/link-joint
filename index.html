@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Link Joint (Firebase) — Demo</title>
+  <title>Link Joint — Full (Pending Approval)</title>
   <style>
     body { font-family: system-ui,Segoe UI,Roboto,Arial; margin: 0; padding: 20px; background:#f6f8fa; color:#111; }
     header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
@@ -16,23 +16,24 @@
     .link-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border-radius:8px; border:1px solid #eee; }
     .btn { cursor:pointer; background:#0366d6; color:white; padding:8px 12px; border-radius:8px; border:none; }
     .btn.ghost { background:transparent; color:#0366d6; border:1px solid #0366d6; }
-    .danger { background:#e55353; }
+    .danger { background:#e55353; color:white; border:none; }
     .muted { color:#666; font-size:0.9rem; }
     table { width:100%; border-collapse:collapse; margin-top:8px; }
     th, td { text-align:left; padding:8px; border-bottom:1px solid #eee; }
     .actions { display:flex; gap:6px; }
     .hidden { display:none; }
     footer { margin-top:20px; font-size:0.85rem; color:#666; }
-    pre { background:#0b1220; color:#cfe; padding:12px; border-radius:8px; overflow:auto; font-size:0.85rem; }
+    select.smallsel { padding:6px; border-radius:6px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:12px; background:#eef; color:#0366d6; font-weight:600; }
   </style>
 </head>
 <body>
   <header>
     <h1>Link Joint</h1>
-    <div id="auth-area" class="card" style="min-width:300px;">
+    <div id="auth-area" class="card" style="min-width:320px;">
       <div id="signed-out-ui">
         <div><strong>Sign in / Sign up</strong></div>
-        <div class="small">Enter a username (like <code>eeeee24</code>) and password. The app will convert it to an email: <code>username@website.com</code>.</div>
+        <div class="small">Enter a username (like <code>eeeee24</code>) and password. It becomes <code>username@website.com</code>.</div>
 
         <label>Username</label>
         <input id="username" placeholder="username (no @)" autocomplete="username" />
@@ -57,16 +58,24 @@
     </div>
   </header>
 
-  <!-- Main app -->
   <main>
-    <section id="admin-panel" class="card hidden">
-      <h2>Admin: Manage Users</h2>
-      <div class="small">Admins can view all users and change role/permission_lvl.</div>
-      <div id="users-table-wrap"></div>
+    <!-- Pending (Admin) -->
+    <section id="pending-panel" class="card hidden">
+      <h2>Pending Approvals</h2>
+      <div class="small">New signups appear here. Approve to create a <code>user_data</code> doc for them.</div>
+      <div id="pending-list" style="margin-top:12px;"></div>
     </section>
 
+    <!-- Admin: Manage Users -->
+    <section id="admin-panel" class="card hidden">
+      <h2>Admin: Manage Users</h2>
+      <div class="small">Admins can edit roles & permission levels.</div>
+      <div id="users-table-wrap" style="margin-top:12px;"></div>
+    </section>
+
+    <!-- Links -->
     <section id="links-panel" class="card hidden">
-      <h2>Links</h2>
+      <h2>Links <span id="perm-badge" class="badge"></span></h2>
       <div id="permission-hint" class="small muted" style="margin-bottom:8px;"></div>
 
       <div id="create-link-form" class="hidden" style="margin-bottom:12px;">
@@ -84,19 +93,18 @@
   </main>
 
   <footer>
-    <div class="small">This demo enforces permissions client-side. You should add server-side Firestore security rules before production.</div>
+    <div class="small">Server-side security is enforced via Firestore Rules (see below). You still need to bootstrap an admin/owner account manually once.</div>
   </footer>
 
+  <!-- Firebase modular SDK -->
   <script type="module">
-    // ---- Firebase setup (using modular SDK) ----
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
     import {
       getAuth,
       createUserWithEmailAndPassword,
       signInWithEmailAndPassword,
       signOut,
-      onAuthStateChanged,
-      updateProfile
+      onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
     import {
@@ -116,7 +124,7 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-    // <-- your firebase config -->
+    // ---- Insert your firebase config here (you provided earlier) ----
     const firebaseConfig = {
       apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
       authDomain: "link-joint.firebaseapp.com",
@@ -147,6 +155,9 @@
     const adminPanel = document.getElementById('admin-panel');
     const usersTableWrap = document.getElementById('users-table-wrap');
 
+    const pendingPanel = document.getElementById('pending-panel');
+    const pendingList = document.getElementById('pending-list');
+
     const linksPanel = document.getElementById('links-panel');
     const createLinkForm = document.getElementById('create-link-form');
     const linkTitleInput = document.getElementById('link-title');
@@ -154,20 +165,28 @@
     const btnCreateLink = document.getElementById('btn-create-link');
     const linksList = document.getElementById('links-list');
     const permissionHint = document.getElementById('permission-hint');
+    const permBadge = document.getElementById('perm-badge');
 
     // ---- Helpers ----
     function usernameToEmail(u) {
-      // sanitize simple whitespace
       return (u.trim() + "@website.com").toLowerCase();
     }
-
     function showMsg(msg, isError = false) {
       authMsg.textContent = msg;
       authMsg.style.color = isError ? '#b00020' : '#666';
-      setTimeout(() => { if (authMsg.textContent === msg) authMsg.textContent = ''; }, 5000);
+      setTimeout(() => { if (authMsg.textContent === msg) authMsg.textContent = ''; }, 6000);
+    }
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
     }
 
-    // ---- Create account ----
+    // ---- Signup (creates Auth user and pending_users doc) ----
     btnSignup.addEventListener('click', async () => {
       const username = usernameInput.value.trim();
       const password = passwordInput.value;
@@ -176,15 +195,14 @@
       try {
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCred.user;
-        // create a user_data doc for the user. default role -> unapproved, permission_lvl -> 0
-        await setDoc(doc(db, 'user_data', user.uid), {
-          role: 'unapproved',
-          permission_lvl: 0,
+        // Create pending_users doc for admin approval
+        await setDoc(doc(db, 'pending_users', user.uid), {
+          uid: user.uid,
+          email: user.email,
           displayName: username,
           createdAt: serverTimestamp()
         });
-        showMsg('Account created. Waiting for admin approval (role=unapproved).');
-        // automatically signed in after createUserWithEmailAndPassword
+        showMsg('Account created. Waiting for admin approval.');
       } catch (err) {
         console.error(err);
         showMsg('Signup error: ' + err.message, true);
@@ -212,65 +230,74 @@
       showMsg('Signed out');
     });
 
-    // ---- Realtime auth state listener ----
+    // ---- State & listeners ----
     let currentUserData = null;
     let linksUnsub = null;
     let usersUnsub = null;
+    let pendingUnsub = null;
 
     onAuthStateChanged(auth, async (user) => {
-      // cleanup listeners
+      // cleanup
       if (linksUnsub) { linksUnsub(); linksUnsub = null; }
       if (usersUnsub) { usersUnsub(); usersUnsub = null; }
+      if (pendingUnsub) { pendingUnsub(); pendingUnsub = null; }
 
       if (user) {
         signedOutUI.classList.add('hidden');
         signedInUI.classList.remove('hidden');
         userDisplay.textContent = `Signed in: ${user.email} (uid: ${user.uid})`;
 
-        // fetch the user's user_data doc
-        const udRef = doc(db, 'user_data', user.uid);
-        const udSnap = await getDoc(udRef);
-        if (!udSnap.exists()) {
-          // create default doc if missing
-          await setDoc(udRef, { role: 'unapproved', permission_lvl: 0, createdAt: serverTimestamp() });
-          currentUserData = { role: 'unapproved', permission_lvl: 0 };
-        } else {
+        // Check if user has a user_data doc (approved)
+        const udSnap = await getDoc(doc(db, 'user_data', user.uid));
+        if (udSnap.exists()) {
           currentUserData = udSnap.data();
-        }
-
-        userRoleDisplay.textContent = `role: ${currentUserData.role} — permission_lvl: ${currentUserData.permission_lvl}`;
-        renderUIForPermissions(user, currentUserData);
-
-        // If admin, subscribe to all users collection for live updates
-        if (currentUserData.role === 'admin') {
-          subscribeToAllUsers();
+          userRoleDisplay.textContent = `role: ${currentUserData.role} — permission_lvl: ${currentUserData.permission_lvl}`;
+          renderUIForPermissions(user, currentUserData);
+          // Admins subscribe to pending and users
+          if (currentUserData.role === 'admin' || currentUserData.role === 'owner') {
+            subscribeToPending();
+            subscribeToAllUsers();
+          }
+        } else {
+          // not approved (no user_data). Check pending_users doc to show status.
+          const puSnap = await getDoc(doc(db, 'pending_users', user.uid));
+          if (puSnap.exists()) {
+            signedInUI.classList.remove('hidden');
+            userRoleDisplay.textContent = `Status: Pending approval`;
+            // Show restricted UI
+            currentUserData = { role: 'unapproved', permission_lvl: 0 };
+            renderUIForPermissions(user, currentUserData);
+          } else {
+            // No pending doc and no user_data (rare). Prompt user to re-signup or contact admin.
+            userRoleDisplay.textContent = `No account data found. Contact admin.`;
+            currentUserData = { role: 'unapproved', permission_lvl: 0 };
+            renderUIForPermissions(user, currentUserData);
+          }
         }
       } else {
-        // signed out
         signedOutUI.classList.remove('hidden');
         signedInUI.classList.add('hidden');
         userDisplay.textContent = 'Signed out';
         userRoleDisplay.textContent = '';
         linksPanel.classList.add('hidden');
         adminPanel.classList.add('hidden');
+        pendingPanel.classList.add('hidden');
       }
     });
 
-    // ---- Subscribe to links collection (real-time) ----
+    // ---- Subscribe to links (if permission >=1) ----
     function subscribeToLinks(user, userData) {
-      // show links if permission_lvl >= 1
       if (!userData || userData.permission_lvl < 1) {
         linksPanel.classList.add('hidden');
         permissionHint.textContent = 'You do not have permission to view links.';
+        permBadge.textContent = '';
         return;
       }
       linksPanel.classList.remove('hidden');
       permissionHint.textContent = '';
+      permBadge.textContent = 'perm: ' + userData.permission_lvl;
 
-      // For listing, admins and higher see all links; normal users see all links (spec didn't say to restrict by role),
-      // but we will show all links to those with view permission.
       const q = query(collection(db, 'links'), orderBy('createdAt', 'desc'));
-
       linksUnsub = onSnapshot(q, (snapshot) => {
         linksList.innerHTML = '';
         if (snapshot.empty) {
@@ -296,14 +323,6 @@
           `;
           const actions = row.querySelector('.actions');
 
-          // Viewers (level >=1) can see links (already enforced)
-          // Create allowed on separate UI
-          // Delete rules:
-          // - permission_lvl 3: can delete any link
-          // - permission_lvl 2: can delete only links they created
-          // Edit rules:
-          // - permission_lvl 3: can edit any link
-          // (Assumption described earlier)
           const pl = userData.permission_lvl || 0;
           const isCreator = (user.uid === creator);
 
@@ -314,7 +333,7 @@
           }
 
           if ((pl >= 3) || (pl >= 2 && isCreator)) {
-            const btnDelete = document.createElement('button'); btnDelete.className = 'btn danger'; btnDelete.textContent = 'Delete';
+            const btnDelete = document.createElement('button'); btnDelete.className = 'danger'; btnDelete.textContent = 'Delete';
             btnDelete.addEventListener('click', async () => {
               if (!confirm('Delete this link?')) return;
               try {
@@ -336,7 +355,7 @@
       });
     }
 
-    // ---- Create link ----
+    // ---- Create link (perm >=2) ----
     btnCreateLink.addEventListener('click', async () => {
       const user = auth.currentUser;
       if (!user) { showMsg('Not signed in', true); return; }
@@ -361,7 +380,7 @@
       }
     });
 
-    // ---- Edit dialog (simple prompt-based) ----
+    // ---- Edit dialog (perm >=3) ----
     async function openEditDialog(linkId, data) {
       const user = auth.currentUser;
       const ud = currentUserData || {};
@@ -380,11 +399,89 @@
       }
     }
 
-    // ---- Admin: subscribe & manage users ----
+    // ---- Admin: subscribe to pending users ----
+    function subscribeToPending() {
+      pendingPanel.classList.remove('hidden');
+      const q = query(collection(db, 'pending_users'), orderBy('createdAt', 'desc'));
+      pendingUnsub = onSnapshot(q, (snapshot) => {
+        pendingList.innerHTML = '';
+        if (snapshot.empty) {
+          pendingList.innerHTML = '<div class="muted">No pending users.</div>';
+          return;
+        }
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const uid = docSnap.id;
+          const html = document.createElement('div');
+          html.className = 'card';
+          html.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div><strong>${escapeHtml(data.displayName || data.email)}</strong></div>
+                <div class="small muted">uid: ${uid} · email: ${escapeHtml(data.email || '')}</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select class="smallsel role-select" data-uid="${uid}">
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                  <option value="owner">owner</option>
+                </select>
+                <input type="number" min="0" max="3" value="1" class="perm-input" data-uid="${uid}" style="width:64px" />
+                <button class="approve btn ghost" data-uid="${uid}">Approve</button>
+                <button class="reject danger" data-uid="${uid}">Reject</button>
+              </div>
+            </div>
+          `;
+          pendingList.appendChild(html);
+
+          // Attach handlers after appended
+          const approveBtn = html.querySelector('.approve');
+          const rejectBtn = html.querySelector('.reject');
+          const roleSel = html.querySelector('.role-select');
+          const permInput = html.querySelector('.perm-input');
+
+          approveBtn.addEventListener('click', async () => {
+            const role = roleSel.value;
+            const perm = parseInt(permInput.value, 10) || 0;
+            if (!confirm(`Approve ${data.displayName || data.email} as ${role} (perm ${perm})?`)) return;
+            try {
+              // Create user_data for that uid
+              await setDoc(doc(db, 'user_data', uid), {
+                role,
+                permission_lvl: perm,
+                displayName: data.displayName || '',
+                createdAt: serverTimestamp()
+              });
+              // Remove pending doc
+              await deleteDoc(doc(db, 'pending_users', uid));
+              showMsg('User approved');
+            } catch (err) {
+              console.error(err);
+              showMsg('Approve error: ' + err.message, true);
+            }
+          });
+
+          rejectBtn.addEventListener('click', async () => {
+            if (!confirm(`Reject and remove ${data.displayName || data.email} from pending?`)) return;
+            try {
+              await deleteDoc(doc(db, 'pending_users', uid));
+              showMsg('Pending user removed. Note: Auth account still exists (delete via Admin SDK if desired).');
+            } catch (err) {
+              console.error(err);
+              showMsg('Reject error: ' + err.message, true);
+            }
+          });
+
+        });
+      }, (err) => {
+        console.error(err);
+        showMsg('Pending listener error: ' + err.message, true);
+      });
+    }
+
+    // ---- Admin: subscribe to all user_data ----
     function subscribeToAllUsers() {
-      // show the admin panel
       adminPanel.classList.remove('hidden');
-      // We'll pull snapshot of all docs in user_data
       const q = query(collection(db, 'user_data'), orderBy('createdAt', 'desc'));
       usersUnsub = onSnapshot(q, (snapshot) => {
         renderUsersTable(snapshot.docs);
@@ -403,10 +500,9 @@
       for (const udoc of userDocs) {
         const ud = udoc.data();
         const uid = udoc.id;
-        const display = ud.displayName || '';
         html += `<tr data-uid="${uid}">
           <td style="max-width:220px; word-break:break-all">${uid}</td>
-          <td>${escapeHtml(display)}</td>
+          <td>${escapeHtml(ud.displayName || '')}</td>
           <td>
             <select class="role-select" data-uid="${uid}">
               <option ${ud.role==='unapproved' ? 'selected' : ''} value="unapproved">unapproved</option>
@@ -425,7 +521,7 @@
       // attach listeners to update buttons
       const updateBtns = usersTableWrap.querySelectorAll('.update-user');
       updateBtns.forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', async () => {
           const uid = btn.dataset.uid;
           const sel = usersTableWrap.querySelector(`.role-select[data-uid="${uid}"]`);
           const permInput = usersTableWrap.querySelector(`.perm-input[data-uid="${uid}"]`);
@@ -442,55 +538,33 @@
       });
     }
 
-    // ---- Render UI depending on permission level ----
+    // ---- Render UI based on permissions ----
     function renderUIForPermissions(user, userData) {
-      // admin panel visibility is handled elsewhere
-      // Links visibility & create form:
-      if (userData.permission_lvl >= 1) {
-        linksPanel.classList.remove('hidden');
-        permissionHint.textContent = '';
-      } else {
+      if (!userData || userData.permission_lvl < 1) {
         linksPanel.classList.add('hidden');
         permissionHint.textContent = 'You do not have permission to view links.';
+        permBadge.textContent = '';
+      } else {
+        subscribeToLinks(user, userData);
       }
 
-      if (userData.permission_lvl >= 2) {
+      if (userData && userData.permission_lvl >= 2) {
         createLinkForm.classList.remove('hidden');
       } else {
         createLinkForm.classList.add('hidden');
       }
 
-      // Subscribe to links if permission >=1
-      if (userData.permission_lvl >= 1) {
-        subscribeToLinks(user, userData);
-      }
-
-      // Admin UI handled in onAuthStateChanged (subscribeToAllUsers)
-      if (userData.role === 'admin') {
-        adminPanel.classList.remove('hidden');
+      // Admin panel/pending is handled by admin subscriptions earlier.
+      if (userData && (userData.role === 'admin' || userData.role === 'owner')) {
+        // handled elsewhere
       } else {
         adminPanel.classList.add('hidden');
+        pendingPanel.classList.add('hidden');
       }
     }
 
-    // ---- Utility: escape to avoid simple injection in element innerHTML ----
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
-
-    // ---- Notes & guidance for production (displayed to console) ----
-    console.log(`Link Joint demo loaded.
-- Collection 'user_data' must contain documents named by UID with fields: role (string), permission_lvl (number).
-- Collection 'links' contains documents with title, url, creator (uid), createdAt (timestamp).
-Important: This client enforces permissions only in the UI. Add Firestore security rules to secure your data in production.
-`);
-
+    // ---- Log guidance ----
+    console.log('Link Joint client loaded. Remember to bootstrap an admin/owner by creating a /user_data/{uid} document manually in the Console for the first admin.');
   </script>
 </body>
 </html>
