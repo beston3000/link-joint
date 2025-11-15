@@ -1,397 +1,558 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Link Joint — Categories & Approval</title>
-  <!-- Firebase compat (no-modules) -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <style>
-    :root{--bg:#0f1116;--card:#17181b;--muted:#9ca3af;--accent:#3b82f6;--danger:#e55353}
-    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; background:linear-gradient(180deg,#0b0d10 0%,#0f1116 100%); color:#e6eef6}
-    .wrap{max-width:1100px;margin:28px auto;padding:20px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
-    h1{font-size:20px;margin:0}
-    .card{background:linear-gradient(180deg,var(--card),#131416);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.02);box-shadow:0 6px 30px rgba(2,6,23,0.6);}
-    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;box-sizing:border-box}
-    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-    .row{display:flex;gap:10px;align-items:center}
-    button{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
-    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent)}
-    button.danger{background:var(--danger)}
-    .muted{color:var(--muted);font-size:13px}
-    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
-    .links, .categories, .admin, .pending{display:grid;gap:10px;margin-top:10px}
-    .item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);background:rgba(255,255,255,0.01)}
-    a{color:inherit}
-    .badge{background:rgba(59,130,246,0.12);color:var(--accent);padding:4px 8px;border-radius:999px;font-weight:600;font-size:12px}
-    footer{margin-top:18px;color:var(--muted);font-size:13px}
-    @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Link Joint — Sidebar (C1)</title>
+
+<!-- Firebase compat -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#0f1116; --muted:#9aa3b2; --accent:#60a5fa; --card:#111318; --danger:#ef5a5a;
+    --sidebar:#0c0f12; --indicator:#fff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:
+    linear-gradient(180deg,var(--bg), #070809); color:#e6eef6}
+  .app{display:flex;min-height:100vh}
+  /* Sidebar (C1 - slim, discord-like) */
+  .sidebar{
+    width:88px; background:linear-gradient(180deg,var(--sidebar),#07080a); padding-top:20px;
+    display:flex;flex-direction:column;align-items:center; gap:6px; position:relative;
+    border-right:1px solid rgba(255,255,255,0.02);
+  }
+  .brand{writing-mode:vertical-rl; transform:rotate(180deg); font-weight:700; font-size:12px; color:var(--muted); margin-bottom:6px}
+  .nav{display:flex;flex-direction:column; gap:8px; width:100%; align-items:center}
+  .nav-btn{
+    width:100%; height:56px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+    color:var(--muted); border-left:6px solid transparent; transition:all .18s ease;
+  }
+  .nav-btn:hover{ background: rgba(255,255,255,0.01); color:var(--accent) }
+  .nav-btn.active{ color:var(--accent); border-left:6px solid var(--indicator); background:rgba(255,255,255,0.02) }
+  .nav-label{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:11px; pointer-events:none }
+  /* Content area */
+  .main{flex:1;padding:22px; display:flex; flex-direction:column; gap:14px}
+  .topbar{display:flex; justify-content:space-between; align-items:center; gap:12px}
+  .card{background:linear-gradient(180deg,var(--card),#0d0f11); border-radius:12px;padding:14px; box-shadow:0 8px 30px rgba(3,6,14,0.6); border:1px solid rgba(255,255,255,0.02)}
+  .row{display:flex;gap:10px;align-items:center}
+  input,select,textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+  button{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#012;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--accent)}
+  button.danger{background:var(--danger);color:white}
+  h2{margin:0;font-size:16px}
+  .muted{color:var(--muted);font-size:13px}
+  .section{display:none} /* tabs hidden by default */
+  .section.active{display:block}
+  .list{display:grid;gap:10px;margin-top:12px}
+  .item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);background:rgba(255,255,255,0.01)}
+  .badge{background:rgba(96,165,250,0.12);color:var(--accent);padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px}
+  footer{margin-top:10px;color:var(--muted);font-size:13px}
+  /* responsive: collapse sidebar to top bar on small screens */
+  @media (max-width:880px){
+    .sidebar{width:64px}
+    .brand{display:none}
+  }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Link Joint — Categories & Approval</h1>
+<div class="app">
+
+  <!-- Sidebar C1 -->
+  <nav class="sidebar card" aria-label="Main navigation">
+    <div class="brand">Link</div>
+    <div id="nav" class="nav" role="tablist" aria-orientation="vertical">
+      <div class="nav-btn" data-tab="links" role="tab" title="Links">
+        <div class="nav-label">Links</div>
+      </div>
+      <div class="nav-btn" data-tab="categories" role="tab" title="Categories">
+        <div class="nav-label">Cats</div>
+      </div>
+      <div id="nav-admin" class="nav-btn" data-tab="admin" role="tab" title="Admin" style="display:none">
+        <div class="nav-label">Admin</div>
+      </div>
+      <div class="nav-btn" data-tab="account" role="tab" title="Account">
+        <div class="nav-label">Acct</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2>Link Joint</h2>
+        <div class="muted" id="top-sub">Manage links, categories, and approvals</div>
+      </div>
+
+      <!-- Auth Card -->
       <div id="auth-card" class="card" style="min-width:320px">
-        <div id="signed-out-ui">
+        <!-- Signed-out -->
+        <div id="signed-out">
           <div style="font-weight:700">Sign in / Sign up</div>
-          <div class="muted" style="margin-bottom:8px">Enter username (eg. <code>eeeee24</code>) and password. Email = <code>username@website.com</code></div>
-          <label>Username</label>
+          <div class="muted" style="margin:8px 0 12px 0; font-size:13px">
+            Enter username (eg. <code>eeeee24</code>) & password. Email used = <code>username@website.com</code>
+          </div>
+          <label class="muted">Username</label>
           <input id="username" placeholder="username" autocomplete="username" />
-          <label>Password</label>
+          <label class="muted">Password</label>
           <input id="password" type="password" placeholder="password" autocomplete="current-password" />
-          <div class="row" style="margin-top:8px">
+          <div class="row" style="margin-top:10px">
             <button id="btn-signup">Create account</button>
             <button id="btn-signin" class="ghost">Sign in</button>
           </div>
-          <div id="auth-msg" class="muted" style="margin-top:10px"></div>
+          <div id="auth-msg" class="muted" style="margin-top:8px"></div>
         </div>
 
-        <div id="signed-in-ui" class="hidden">
+        <!-- Signed-in -->
+        <div id="signed-in" style="display:none">
           <div style="font-weight:700">Signed in as <span id="user-display"></span></div>
           <div class="muted" id="user-role-display" style="margin-top:6px"></div>
-          <div class="row" style="margin-top:10px">
+          <div class="row" style="margin-top:8px">
             <button id="btn-logout" class="ghost">Sign out</button>
           </div>
         </div>
       </div>
-    </header>
+    </div>
 
-    <main class="grid">
-      <section>
-        <div id="links-panel" class="card hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <h2 style="margin:0">Links <span id="perm-badge" class="badge"></span></h2>
-            <div class="muted" id="permission-hint"></div>
-          </div>
+    <!-- Links section -->
+    <section id="links" class="card section">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><h2>Links <span id="perm-badge" class="badge"></span></h2></div>
+        <div id="links-hint" class="muted"></div>
+      </div>
 
-          <div id="create-link-form" style="margin-top:12px" class="hidden card">
-            <label>Title</label>
-            <input id="link-title" placeholder="Link title" />
-            <label>URL</label>
-            <input id="link-url" placeholder="https://example.com" />
-            <label>Category</label>
-            <select id="link-category-select"><option value="none">Unsorted</option></select>
-            <div class="row" style="margin-top:8px">
-              <button id="btn-create-link">Create link</button>
-            </div>
-          </div>
+      <div id="create-link" class="card" style="margin-top:12px; display:none">
+        <label class="muted">Title</label>
+        <input id="link-title" placeholder="Title" />
+        <label class="muted">URL</label>
+        <input id="link-url" placeholder="https://example.com" />
+        <label class="muted">Category</label>
+        <select id="link-category"><option value="none">Unsorted</option></select>
+        <div style="margin-top:8px" class="row"><button id="create-link-btn">Create link</button></div>
+      </div>
 
-          <div id="links-list" class="links" style="margin-top:12px"></div>
-        </div>
+      <div id="links-list" class="list" style="margin-top:12px"></div>
+    </section>
 
-        <div id="categories-panel" class="card hidden" style="margin-top:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <h2 style="margin:0">Categories</h2>
-            <div class="muted">Same permission rules as links</div>
-          </div>
+    <!-- Categories section -->
+    <section id="categories" class="card section">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><h2>Categories</h2></div>
+        <div class="muted">View or manage categories</div>
+      </div>
 
-          <div id="create-category-form" class="card hidden" style="margin-top:12px">
-            <label>New category name</label>
-            <input id="category-name" placeholder="Category name" />
-            <div class="row" style="margin-top:8px">
-              <button id="btn-create-category">Create category</button>
-            </div>
-          </div>
+      <div id="create-cat" class="card" style="margin-top:12px; display:none">
+        <label class="muted">New category name</label>
+        <input id="cat-name" placeholder="Category name" />
+        <div style="margin-top:8px" class="row"><button id="create-cat-btn">Create category</button></div>
+      </div>
 
-          <div id="categories-list" class="categories" style="margin-top:12px"></div>
-        </div>
-      </section>
+      <div id="cats-list" class="list" style="margin-top:12px"></div>
+    </section>
 
-      <aside>
-        <div id="pending-panel" class="card hidden">
-          <h3>Pending approvals</h3>
-          <div id="pending-list" class="pending"></div>
-        </div>
+    <!-- Admin section -->
+    <section id="admin" class="card section">
+      <h2>Pending approvals</h2>
+      <div id="pending-box" class="list" style="margin-top:12px"></div>
 
-        <div id="admin-panel" class="card hidden" style="margin-top:12px">
-          <h3>Admin: Users</h3>
-          <div id="users-table-wrap"></div>
-        </div>
+      <h2 style="margin-top:12px">Users</h2>
+      <div id="users-box" class="list" style="margin-top:12px"></div>
+    </section>
 
-        <div class="card" style="margin-top:12px">
-          <div class="muted">Tip: Bootstrap at least one <code>/user_data/{uid}</code> with role "owner" or "admin" and permission_lvl 3 in the Console to approve users.</div>
-        </div>
-      </aside>
-    </main>
+    <!-- Account section -->
+    <section id="account" class="card section">
+      <h2>Account</h2>
+      <div class="muted" id="account-info">You must sign in to see account info.</div>
+    </section>
 
-    <footer>Client UI enforces permissions for usability. Firestore rules must be deployed (I provided them earlier) to enforce server-side access.</footer>
-  </div>
+    <footer>Client UI — permissions are enforced server-side by your Firestore rules.</footer>
+  </main>
+</div>
 
-  <script>
-    // ------------------ Firebase compat init ------------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
-      authDomain: "link-joint.firebaseapp.com",
-      projectId: "link-joint",
-      storageBucket: "link-joint.firebasestorage.app",
-      messagingSenderId: "568319687772",
-      appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
-      measurementId: "G-W88WBHPEDZ"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+<script>
+/* ---------------- Firebase init (compat) ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBHNeca9gURUczisK4gNV6LhBfzK65vg9U",
+  authDomain: "link-joint.firebaseapp.com",
+  projectId: "link-joint",
+  storageBucket: "link-joint.firebasestorage.app",
+  messagingSenderId: "568319687772",
+  appId: "1:568319687772:web:0f04ad3a1d2597da63ba99",
+  measurementId: "G-W88WBHPEDZ"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-    // DOM refs
-    const signedOutUI = document.getElementById('signed-out-ui');
-    const signedInUI = document.getElementById('signed-in-ui');
-    const userDisplay = document.getElementById('user-display');
-    const userRoleDisplay = document.getElementById('user-role-display');
-    const authMsg = document.getElementById('auth-msg');
+/* ---------------- DOM refs ---------------- */
+const navButtons = document.querySelectorAll('.nav-btn');
+const sections = document.querySelectorAll('.section');
+const navAdmin = document.getElementById('nav-admin');
 
-    const linksPanel = document.getElementById('links-panel');
-    const createLinkForm = document.getElementById('create-link-form');
-    const linkTitleInput = document.getElementById('link-title');
-    const linkUrlInput = document.getElementById('link-url');
-    const linkCategorySelect = document.getElementById('link-category-select');
-    const btnCreateLink = document.getElementById('btn-create-link');
-    const linksList = document.getElementById('links-list');
-    const permissionHint = document.getElementById('permission-hint');
-    const permBadge = document.getElementById('perm-badge');
+const signedOutEl = document.getElementById('signed-out');
+const signedInEl = document.getElementById('signed-in');
+const userDisplay = document.getElementById('user-display');
+const userRoleDisplay = document.getElementById('user-role-display');
+const authMsg = document.getElementById('auth-msg');
 
-    const categoriesPanel = document.getElementById('categories-panel');
-    const createCategoryForm = document.getElementById('create-category-form');
-    const categoryNameInput = document.getElementById('category-name');
-    const btnCreateCategory = document.getElementById('btn-create-category');
-    const categoriesList = document.getElementById('categories-list');
+const btnSignup = document.getElementById('btn-signup');
+const btnSignin = document.getElementById('btn-signin');
+const btnLogout = document.getElementById('btn-logout');
 
-    const pendingPanel = document.getElementById('pending-panel');
-    const pendingList = document.getElementById('pending-list');
+const permBadge = document.getElementById('perm-badge');
+const linksPanel = document.getElementById('links');
+const categoriesPanel = document.getElementById('categories');
+const adminPanel = document.getElementById('admin');
+const accountPanel = document.getElementById('account');
 
-    const adminPanel = document.getElementById('admin-panel');
-    const usersTableWrap = document.getElementById('users-table-wrap');
+const createLinkCard = document.getElementById('create-link');
+const linkTitleInput = document.getElementById('link-title');
+const linkUrlInput = document.getElementById('link-url');
+const linkCategorySelect = document.getElementById('link-category');
+const createLinkBtn = document.getElementById('create-link-btn');
+const linksList = document.getElementById('links-list');
+const linksHint = document.getElementById('links-hint');
 
-    const btnSignup = document.getElementById('btn-signup');
-    const btnSignin = document.getElementById('btn-signin');
-    const btnLogout = document.getElementById('btn-logout');
+const createCatCard = document.getElementById('create-cat');
+const catNameInput = document.getElementById('cat-name');
+const createCatBtn = document.getElementById('create-cat-btn');
+const catsList = document.getElementById('cats-list');
 
-    // state
-    let currentUser = null;
-    let currentUserData = null;
-    let linksUnsub = null;
-    let categoriesUnsub = null;
-    let pendingUnsub = null;
-    let usersUnsub = null;
+const pendingBox = document.getElementById('pending-box');
+const usersBox = document.getElementById('users-box');
 
-    function usernameToEmail(u){ return (u.trim() + '@website.com').toLowerCase(); }
-    function showMsg(m, isErr=false){ authMsg.textContent = m; authMsg.style.color = isErr ? '#ffb4b4' : '#aab6ff'; setTimeout(()=>{ if(authMsg.textContent===m) authMsg.textContent=''; },6000); }
-    function el(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+const accountInfo = document.getElementById('account-info');
 
-    // auth actions
-    btnSignup.addEventListener('click', async ()=>{
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value;
-      if(!u||!p){ showMsg('Provide username & password', true); return; }
-      const email = usernameToEmail(u);
-      try{
-        const cred = await auth.createUserWithEmailAndPassword(email,p);
-        // create pending_users doc for approval flow
-        await db.collection('pending_users').doc(cred.user.uid).set({ uid: cred.user.uid, email: cred.user.email, displayName: u, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        showMsg('Account created — waiting for admin approval');
-      }catch(e){ console.error(e); showMsg('Signup error: '+e.message, true); }
+let currentUser = null;
+let currentUserData = null;
+let unsubLinks = null, unsubCats = null, unsubPending = null, unsubUsers = null;
+
+/* -------------- small helpers -------------- */
+function usernameToEmail(u){ return (u.trim() + '@website.com').toLowerCase(); }
+function showAuthMsg(msg, err=false){ authMsg.textContent = msg; authMsg.style.color = err? 'salmon' : '#9fb3ff'; setTimeout(()=>{ if(authMsg.textContent===msg) authMsg.textContent=''; },5000); }
+function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
+
+/* -------------- tab logic -------------- */
+function activateTab(name){
+  navButtons.forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  sections.forEach(s=> s.classList.toggle('active', s.id === name));
+}
+navButtons.forEach(b=> b.addEventListener('click', ()=> activateTab(b.dataset.tab)));
+activateTab('links'); // default
+
+/* -------------- auth actions -------------- */
+btnSignup.addEventListener('click', async ()=>{
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  if(!u || !p){ showAuthMsg('Provide username & password', true); return; }
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(usernameToEmail(u), p);
+    // create pending_users record
+    await db.collection('pending_users').doc(cred.user.uid).set({
+      uid: cred.user.uid, email: cred.user.email, displayName: u, createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    showAuthMsg('Account created — waiting for admin approval');
+  }catch(e){ console.error(e); showAuthMsg('Signup error: '+e.message, true); }
+});
 
-    btnSignin.addEventListener('click', async ()=>{
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value;
-      if(!u||!p){ showMsg('Provide username & password', true); return; }
-      const email = usernameToEmail(u);
-      try{ await auth.signInWithEmailAndPassword(email,p); showMsg('Signed in'); }
-      catch(e){ console.error(e); showMsg('Sign-in error: '+e.message, true); }
-    });
+btnSignin.addEventListener('click', async ()=>{
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  if(!u || !p){ showAuthMsg('Provide username & password', true); return; }
+  try{
+    await auth.signInWithEmailAndPassword(usernameToEmail(u), p);
+    showAuthMsg('Signed in');
+  }catch(e){ console.error(e); showAuthMsg('Sign-in error: '+e.message, true); }
+});
 
-    btnLogout.addEventListener('click', async ()=>{ await auth.signOut(); location.reload(); });
+btnLogout.addEventListener('click', async ()=>{
+  await auth.signOut();
+  location.reload();
+});
 
-    // auth state listener
-    auth.onAuthStateChanged(async (user)=>{
-      // clean up listeners
-      if(linksUnsub){ linksUnsub(); linksUnsub = null; }
-      if(categoriesUnsub){ categoriesUnsub(); categoriesUnsub = null; }
-      if(pendingUnsub){ pendingUnsub(); pendingUnsub = null; }
-      if(usersUnsub){ usersUnsub(); usersUnsub = null; }
+/* -------------- auth state listener -------------- */
+auth.onAuthStateChanged(async user => {
+  // clear subscriptions
+  if(unsubLinks){ unsubLinks(); unsubLinks = null; }
+  if(unsubCats){ unsubCats(); unsubCats = null; }
+  if(unsubPending){ unsubPending(); unsubPending = null; }
+  if(unsubUsers){ unsubUsers(); unsubUsers = null; }
 
-      currentUser = user;
-      if(!user){ signedOutUI.classList.remove('hidden'); signedInUI.classList.add('hidden'); linksPanel.classList.add('hidden'); categoriesPanel.classList.add('hidden'); pendingPanel.classList.add('hidden'); adminPanel.classList.add('hidden'); return; }
+  currentUser = user;
+  // hide everything until we finish checks
+  signedOutEl.style.display = user ? 'none' : 'block';
+  signedInEl.style.display = user ? 'block' : 'none';
+  // hide content until validated
+  linksPanel.classList.remove('active'); categoriesPanel.classList.remove('active'); adminPanel.classList.remove('active'); accountPanel.classList.remove('active');
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
 
-      signedOutUI.classList.add('hidden'); signedInUI.classList.remove('hidden'); userDisplay.textContent = user.email;
+  if(!user){
+    // show minimal UI (only auth)
+    activateTab('account');
+    accountInfo.textContent = 'You are signed out. Sign in or create an account.';
+    navAdmin.style.display = 'none';
+    return;
+  }
 
-      // check user_data (approved) first
-      const udSnap = await db.collection('user_data').doc(user.uid).get();
-      if(udSnap.exists){ currentUserData = udSnap.data(); }
-      else {
-        // if not approved, check pending_users - show pending status
-        const pSnap = await db.collection('pending_users').doc(user.uid).get();
-        if(pSnap.exists()){ currentUserData = { role:'unapproved', permission_lvl:0 }; showMsg('Account pending approval — limited access'); }
-        else { currentUserData = { role:'unapproved', permission_lvl:0 }; showMsg('No account data found. Contact admin.'); }
+  // We are signed in — check for user_data doc to determine role & perms
+  try{
+    const ud = await db.collection('user_data').doc(user.uid).get();
+    if(ud.exists){
+      currentUserData = ud.data();
+    } else {
+      // no user_data — user may be pending
+      const pending = await db.collection('pending_users').doc(user.uid).get();
+      if(pending.exists){
+        currentUserData = { role:'unapproved', permission_lvl:0 };
+        showAuthMsg('Account pending approval — limited access');
+      } else {
+        currentUserData = { role:'unapproved', permission_lvl:0 };
+        showAuthMsg('No account data found. Contact admin to approve.', true);
       }
+    }
+  }catch(e){
+    console.error('Error fetching user_data:', e);
+    showAuthMsg('Error reading account info: '+ (e.message||e), true);
+    currentUserData = { role:'unapproved', permission_lvl:0 };
+  }
 
-      userRoleDisplay.textContent = `role: ${currentUserData.role} — perm: ${currentUserData.permission_lvl}`;
+  // show user info in auth card
+  userDisplay.textContent = user.email;
+  userRoleDisplay.textContent = `role: ${currentUserData.role} — perm: ${currentUserData.permission_lvl}`;
 
-      // render UI based on perms
-      renderUIForPermissions();
+  // show/hide admin nav
+  navAdmin.style.display = (currentUserData.role === 'admin' || currentUserData.role === 'owner') ? 'block' : 'none';
 
-      // live subscriptions
-      subscribeCategories();
-      if(currentUserData.permission_lvl >= 1) subscribeLinks();
-      if(currentUserData.role === 'admin' || currentUserData.role === 'owner'){
-        subscribePending();
-        subscribeUsers();
-      }
-    });
+  // enable default tab (links) if permission >=1, otherwise show account/warning
+  if(currentUserData.permission_lvl >= 1){
+    activateTab('links');
+  } else {
+    activateTab('account');
+    accountInfo.textContent = 'Your account is not approved yet — ask an admin to approve you.';
+  }
 
-    // ---------------- Links ----------------
-    function subscribeLinks(){
-      linksPanel.classList.remove('hidden');
-      permissionHint.textContent = '';
-      permBadge.textContent = 'perm ' + (currentUserData.permission_lvl || 0);
-      linksUnsub = db.collection('links').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+  // Set up live listeners, guarded by try/catch (permission errors handled gracefully)
+  if(currentUserData.permission_lvl >= 1){
+    subscribeLinks();
+  } else {
+    linksPanel.style.display = 'none';
+  }
+
+  subscribeCategories(); // categories are readable by perm >=1; function handles permission errors
+
+  if(currentUserData.role === 'admin' || currentUserData.role === 'owner'){
+    subscribePending();
+    subscribeUsers();
+  }
+});
+
+/* -------------- Links subscription & CRUD -------------- */
+function subscribeLinks(){
+  linksPanel.style.display = 'block';
+  permBadge.textContent = 'perm ' + (currentUserData.permission_lvl || 0);
+  linksHint.textContent = '';
+  try{
+    unsubLinks = db.collection('links').orderBy('createdAt','desc')
+      .onSnapshot(snapshot => {
         linksList.innerHTML = '';
         if(snapshot.empty){ linksList.innerHTML = '<div class="muted">No links yet.</div>'; return; }
         snapshot.forEach(doc=>{
-          const d = doc.data();
+          const d = doc.data(); const id = doc.id;
           const item = document.createElement('div'); item.className='item';
           const left = document.createElement('div'); left.style.flex='1';
-          left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.title)}</div><div class="muted"><a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">${escapeHtml(d.url)}</a></div><div class="muted">Category: ${escapeHtml(d.category||'none')}</div>`;
-          const actions = document.createElement('div'); actions.className='row';
-
+          left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.title || '')}</div>
+            <div class="muted"><a href="${escapeHtml(d.url||'#')}" target="_blank" rel="noopener">${escapeHtml(d.url||'')}</a></div>
+            <div class="muted">Category: ${escapeHtml(d.category||'none')}</div>`;
+          const right = document.createElement('div'); right.className='row';
           const pl = currentUserData.permission_lvl || 0;
-          const isCreator = (currentUser && d.creator === currentUser.uid);
-
-          if(pl >= 3){ const edit = document.createElement('button'); edit.className='ghost'; edit.textContent='Edit'; edit.addEventListener('click', ()=> editLink(doc.id, d)); actions.appendChild(edit); }
-          if((pl >= 3) || (pl >= 2 && isCreator)){ const del = document.createElement('button'); del.className='danger'; del.textContent='Delete'; del.addEventListener('click', async ()=>{ if(!confirm('Delete link?')) return; try{ await db.collection('links').doc(doc.id).delete(); showMsg('Link deleted'); }catch(e){ showMsg('Delete failed: '+e.message,true); } }); actions.appendChild(del); }
-
-          item.appendChild(left); item.appendChild(actions); linksList.appendChild(item);
+          const isCreator = currentUser && d.creator === currentUser.uid;
+          if(pl >= 3){
+            const edit = document.createElement('button'); edit.className='ghost'; edit.textContent='Edit';
+            edit.addEventListener('click', ()=> editLink(id,d));
+            right.appendChild(edit);
+          }
+          if((pl >= 3) || (pl >=2 && isCreator)){
+            const del = document.createElement('button'); del.className='danger'; del.textContent='Delete';
+            del.addEventListener('click', async ()=> {
+              if(!confirm('Delete this link?')) return;
+              try{ await db.collection('links').doc(id).delete(); }catch(e){ showAuthMsg('Delete failed: '+e.message,true); }
+            });
+            right.appendChild(del);
+          }
+          item.appendChild(left); item.appendChild(right); linksList.appendChild(item);
         });
-      }, err=>{ console.error(err); showMsg('Links error: '+err.message,true); });
-    }
+      }, err => {
+        console.error('Links onSnapshot error', err);
+        linksList.innerHTML = `<div class="muted">Error loading links: ${escapeHtml(err.message||String(err))}</div>`;
+      });
+  }catch(e){
+    console.error('subscribeLinks error', e);
+    linksList.innerHTML = `<div class="muted">Permission error loading links.</div>`;
+  }
+}
 
-    async function createLink(){
-      if(!currentUser) return showMsg('Not signed in', true);
-      if((currentUserData.permission_lvl||0) < 2) return showMsg('Insufficient permission to create links', true);
-      const title = linkTitleInput.value.trim(); const url = linkUrlInput.value.trim(); const cat = linkCategorySelect.value || 'none';
-      if(!title||!url) return showMsg('Provide title and url', true);
-      try{ await db.collection('links').add({ title, url, category: cat, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); linkTitleInput.value=''; linkUrlInput.value=''; showMsg('Link created'); }catch(e){ console.error(e); showMsg('Create failed: '+e.message,true); }
-    }
+createLinkBtn.addEventListener('click', async ()=>{
+  if(!currentUser) return showAuthMsg('Sign in first', true);
+  if((currentUserData.permission_lvl||0) < 2) return showAuthMsg('Insufficient permission to create links', true);
+  const title = linkTitleInput.value.trim(); const url = linkUrlInput.value.trim(); const cat = linkCategorySelect.value || 'none';
+  if(!title||!url) return showAuthMsg('Provide title and url', true);
+  try{
+    await db.collection('links').add({ title, url, category: cat, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    linkTitleInput.value=''; linkUrlInput.value='';
+    showAuthMsg('Link created');
+  }catch(e){ console.error(e); showAuthMsg('Create link error: '+e.message, true); }
+});
 
-    async function editLink(id, data){
-      if((currentUserData.permission_lvl||0) < 3) return showMsg('Insufficient permission to edit links', true);
-      const newTitle = prompt('Title', data.title); if(newTitle === null) return; const newUrl = prompt('URL', data.url); if(newUrl === null) return; const newCat = prompt('Category (use id or name)', data.category||'none'); if(newCat === null) return;
-      try{ await db.collection('links').doc(id).update({ title: newTitle, url: newUrl, category: newCat }); showMsg('Link updated'); }catch(e){ showMsg('Update failed: '+e.message,true); }
-    }
+async function editLink(id,data){
+  if((currentUserData.permission_lvl||0) < 3) return showAuthMsg('Insufficient permission to edit links', true);
+  const newTitle = prompt('Title', data.title) ; if(newTitle === null) return;
+  const newUrl = prompt('URL', data.url) ; if(newUrl === null) return;
+  const newCat = prompt('Category id/name (or none)', data.category || 'none'); if(newCat === null) return;
+  try{ await db.collection('links').doc(id).update({ title: newTitle, url: newUrl, category: newCat }); showAuthMsg('Link updated'); }
+  catch(e){ showAuthMsg('Update failed: '+e.message,true); }
+}
 
-    // ---------------- Categories ----------------
-    function subscribeCategories(){
-      categoriesPanel.classList.remove('hidden');
-      categoriesUnsub = db.collection('categories').orderBy('name').onSnapshot(snapshot=>{
-        categoriesList.innerHTML=''; linkCategorySelect.innerHTML = '<option value="none">Unsorted</option>';
-        if(snapshot.empty){ categoriesList.innerHTML = '<div class="muted">No categories yet.</div>'; return; }
-        snapshot.forEach(doc=>{
-          const c = doc.data(); const id = doc.id;
-          linkCategorySelect.innerHTML += `<option value="${escapeHtml(id)}">${escapeHtml(c.name)}</option>`;
-
-          const item = document.createElement('div'); item.className='item';
-          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(c.name)}</div><div class="muted">created by: ${escapeHtml(c.creator||'')}</div>`;
-          const actions = document.createElement('div'); actions.className='row';
-
-          const pl = currentUserData.permission_lvl || 0;
-          const isCreator = (currentUser && c.creator === currentUser.uid);
-
-          if((pl >= 3) || (pl >=2 && isCreator)){ const del = document.createElement('button'); del.className='danger'; del.textContent='Delete'; del.addEventListener('click', async ()=>{ if(!confirm('Delete category?')) return; try{ await db.collection('categories').doc(id).delete(); showMsg('Category deleted'); }catch(e){ showMsg('Delete failed: '+e.message,true); } }); actions.appendChild(del); }
-
-          item.appendChild(left); item.appendChild(actions); categoriesList.appendChild(item);
-        });
-      }, err=>{ console.error(err); showMsg('Categories error: '+err.message,true); });
-    }
-
-    async function createCategory(){
-      if(!currentUser) return showMsg('Not signed in', true);
-      if((currentUserData.permission_lvl||0) < 2) return showMsg('Insufficient permission to create categories', true);
-      const name = categoryNameInput.value.trim(); if(!name) return showMsg('Provide category name', true);
-      try{ await db.collection('categories').add({ name, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); categoryNameInput.value=''; showMsg('Category created'); }catch(e){ showMsg('Create failed: '+e.message,true); }
-    }
-
-    // ---------------- Pending (admin) ----------------
-    function subscribePending(){
-      pendingPanel.classList.remove('hidden');
-      pendingUnsub = db.collection('pending_users').orderBy('createdAt','desc').onSnapshot(snapshot=>{
-        pendingList.innerHTML=''; if(snapshot.empty){ pendingList.innerHTML = '<div class="muted">No pending users.</div>'; return; }
-        snapshot.forEach(doc=>{
-          const d = doc.data(); const uid = doc.id;
-          const card = document.createElement('div'); card.className='item';
-          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.displayName||d.email)}</div><div class="muted">${escapeHtml(d.email)}</div>`;
-          const actions = document.createElement('div'); actions.className='row';
-
-          const roleSel = document.createElement('select'); ['user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; roleSel.appendChild(o); });
-          const permInput = document.createElement('input'); permInput.type='number'; permInput.min=0; permInput.max=3; permInput.value=1; permInput.style.width='72px';
-          const approveBtn = document.createElement('button'); approveBtn.className='ghost'; approveBtn.textContent='Approve';
-          const rejectBtn = document.createElement('button'); rejectBtn.className='danger'; rejectBtn.textContent='Reject';
-
-          approveBtn.addEventListener('click', async ()=>{
-            const role = roleSel.value; const perm = parseInt(permInput.value,10)||0; if(!confirm(`Approve ${d.displayName||d.email} as ${role} (perm ${perm})?`)) return;
-            try{
-              await db.collection('user_data').doc(uid).set({ role, permission_lvl: perm, displayName: d.displayName||'', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-              await db.collection('pending_users').doc(uid).delete();
-              showMsg('User approved');
-            }catch(e){ showMsg('Approve failed: '+e.message,true); }
+/* -------------- Categories subscription & CRUD -------------- */
+function subscribeCategories(){
+  // Always attempt to subscribe — Firestore rules may reject; handle errors gracefully
+  try{
+    if(unsubCats){ unsubCats(); unsubCats=null; }
+    unsubCats = db.collection('categories').orderBy('name').onSnapshot(snapshot=>{
+      catsList.innerHTML = ''; linkCategorySelect.innerHTML = '<option value="none">Unsorted</option>';
+      if(snapshot.empty){ catsList.innerHTML = '<div class="muted">No categories yet.</div>'; return; }
+      snapshot.forEach(doc=>{
+        const c = doc.data(); const id = doc.id;
+        linkCategorySelect.innerHTML += `<option value="${escapeHtml(id)}">${escapeHtml(c.name)}</option>`;
+        const item = document.createElement('div'); item.className='item';
+        const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(c.name)}</div><div class="muted">by ${escapeHtml(c.creator||'')}</div>`;
+        const right = document.createElement('div'); right.className='row';
+        const pl = currentUserData.permission_lvl || 0;
+        const isCreator = currentUser && c.creator === currentUser.uid;
+        if((pl >= 3) || (pl >= 2 && isCreator)){
+          const del = document.createElement('button'); del.className='danger'; del.textContent='Delete';
+          del.addEventListener('click', async ()=> {
+            if(!confirm('Delete this category?')) return;
+            try{ await db.collection('categories').doc(id).delete(); showAuthMsg('Category deleted'); }catch(e){ showAuthMsg('Category delete failed: '+e.message,true); }
           });
+          right.appendChild(del);
+        }
+        item.appendChild(left); item.appendChild(right); catsList.appendChild(item);
+      });
+    }, err=>{
+      console.error('categories onSnapshot error',err);
+      catsList.innerHTML = `<div class="muted">Categories error: ${escapeHtml(err.message||String(err))}</div>`;
+      // If permission denied, hide create UI
+      createCatCard.style.display = 'none';
+    });
+  }catch(e){
+    console.error('subscribeCategories error', e);
+    catsList.innerHTML = `<div class="muted">Permission error loading categories.</div>`;
+    createCatCard.style.display = 'none';
+  }
+}
 
-          rejectBtn.addEventListener('click', async ()=>{
-            if(!confirm(`Reject ${d.displayName||d.email}? This will only remove pending entry.`)) return;
-            try{ await db.collection('pending_users').doc(uid).delete(); showMsg('Pending removed'); }catch(e){ showMsg('Reject failed: '+e.message,true); }
-          });
+createCatBtn.addEventListener('click', async ()=>{
+  if(!currentUser) return showAuthMsg('Sign in first', true);
+  if((currentUserData.permission_lvl||0) < 2) return showAuthMsg('Insufficient permission to create categories', true);
+  const name = catNameInput.value.trim(); if(!name) return showAuthMsg('Provide category name', true);
+  try{ await db.collection('categories').add({ name, creator: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); catNameInput.value=''; showAuthMsg('Category created'); }
+  catch(e){ showAuthMsg('Create category error: '+e.message,true); }
+});
 
-          actions.appendChild(roleSel); actions.appendChild(permInput); actions.appendChild(approveBtn); actions.appendChild(rejectBtn);
-          card.appendChild(left); card.appendChild(actions); pendingList.appendChild(card);
+/* -------------- Pending & Admin users -------------- */
+function subscribePending(){
+  try{
+    if(unsubPending) { unsubPending(); unsubPending = null; }
+    unsubPending = db.collection('pending_users').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+      pendingBox.innerHTML = '';
+      if(snapshot.empty){ pendingBox.innerHTML = '<div class="muted">No pending users.</div>'; return; }
+      snapshot.forEach(doc=>{
+        const d = doc.data(); const uid = doc.id;
+        const item = document.createElement('div'); item.className='item';
+        const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(d.displayName||d.email)}</div><div class="muted">${escapeHtml(d.email||'')}</div>`;
+        const right = document.createElement('div'); right.className='row';
+        const roleSel = document.createElement('select'); ['user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; roleSel.appendChild(o); });
+        const permInput = document.createElement('input'); permInput.type='number'; permInput.min=0; permInput.max=3; permInput.value=1; permInput.style.width='72px';
+        const approve = document.createElement('button'); approve.className='ghost'; approve.textContent='Approve';
+        const reject = document.createElement('button'); reject.className='danger'; reject.textContent='Reject';
+        approve.addEventListener('click', async ()=>{
+          const role = roleSel.value; const perm = parseInt(permInput.value,10)||0;
+          if(!confirm(`Approve ${d.displayName||d.email} as ${role} (perm ${perm})?`)) return;
+          try{
+            await db.collection('user_data').doc(uid).set({ role, permission_lvl: perm, displayName: d.displayName||'', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            await db.collection('pending_users').doc(uid).delete();
+            showAuthMsg('User approved');
+          }catch(e){ showAuthMsg('Approve failed: '+e.message,true); }
         });
-      }, err=>{ console.error(err); showMsg('Pending listener error: '+err.message,true); });
-    }
-
-    // ---------------- Admin users ----------------
-    function subscribeUsers(){
-      adminPanel.classList.remove('hidden');
-      usersUnsub = db.collection('user_data').orderBy('createdAt','desc').onSnapshot(snapshot=>{
-        usersTableWrap.innerHTML=''; if(snapshot.empty){ usersTableWrap.innerHTML='<div class="muted">No users</div>'; return; }
-        const table = document.createElement('div'); table.style.display='grid'; table.style.gap='8px';
-        snapshot.forEach(doc=>{
-          const u = doc.data(); const uid = doc.id;
-          const row = document.createElement('div'); row.className='item';
-          const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(u.displayName||'')}</div><div class="muted">${escapeHtml(uid)}</div>`;
-          const actions = document.createElement('div'); actions.className='row';
-          const roleSel = document.createElement('select'); ['unapproved','user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; if(u.role===r) o.selected=true; roleSel.appendChild(o); });
-          const permSel = document.createElement('select'); [0,1,2,3].forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; if(u.permission_lvl===n) o.selected=true; permSel.appendChild(o); });
-          const saveBtn = document.createElement('button'); saveBtn.className='ghost'; saveBtn.textContent='Save';
-          saveBtn.addEventListener('click', async ()=>{ try{ await db.collection('user_data').doc(uid).update({ role: roleSel.value, permission_lvl: parseInt(permSel.value,10) }); showMsg('User updated'); }catch(e){ showMsg('Update failed: '+e.message,true); } });
-          actions.appendChild(roleSel); actions.appendChild(permSel); actions.appendChild(saveBtn);
-          row.appendChild(left); row.appendChild(actions); table.appendChild(row);
+        reject.addEventListener('click', async ()=>{
+          if(!confirm('Reject and remove pending entry?')) return;
+          try{ await db.collection('pending_users').doc(uid).delete(); showAuthMsg('Pending removed'); }catch(e){ showAuthMsg('Reject failed: '+e.message,true); }
         });
-        usersTableWrap.appendChild(table);
-      }, err=>{ console.error(err); showMsg('Users listener error: '+err.message,true); });
-    }
+        right.appendChild(roleSel); right.appendChild(permInput); right.appendChild(approve); right.appendChild(reject);
+        item.appendChild(left); item.appendChild(right); pendingBox.appendChild(item);
+      });
+    }, err=>{ console.error('pending onSnapshot',err); pendingBox.innerHTML = `<div class="muted">Pending error: ${escapeHtml(err.message||String(err))}</div>`; });
+  }catch(e){ console.error('subscribePending',e); pendingBox.innerHTML = `<div class="muted">Permission error reading pending users</div>`; }
+}
 
-    // ---------------- Helpers ----------------
-    function renderUIForPermissions(){
-      const pl = currentUserData.permission_lvl || 0;
-      if(pl >= 1){ linksPanel.classList.remove('hidden'); }
-      else { linksPanel.classList.add('hidden'); permissionHint.textContent = 'No view permission'; }
-      if(pl >= 2){ createLinkForm.classList.remove('hidden'); createCategoryForm.classList.remove('hidden'); }
-      else { createLinkForm.classList.add('hidden'); createCategoryForm.classList.add('hidden'); }
-      if(pl >= 1){ categoriesPanel.classList.remove('hidden'); }
-      else { categoriesPanel.classList.add('hidden'); }
-    }
+function subscribeUsers(){
+  try{
+    if(unsubUsers){ unsubUsers(); unsubUsers = null; }
+    unsubUsers = db.collection('user_data').orderBy('createdAt','desc').onSnapshot(snapshot=>{
+      usersBox.innerHTML = '';
+      if(snapshot.empty){ usersBox.innerHTML = '<div class="muted">No users found.</div>'; return; }
+      snapshot.forEach(doc=>{
+        const u = doc.data(); const uid = doc.id;
+        const item = document.createElement('div'); item.className='item';
+        const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:700">${escapeHtml(u.displayName||'')}</div><div class="muted">${escapeHtml(uid)}</div>`;
+        const right = document.createElement('div'); right.className='row';
+        const roleSel = document.createElement('select'); ['unapproved','user','admin','owner'].forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; if(u.role===r) o.selected=true; roleSel.appendChild(o); });
+        const permSel = document.createElement('select'); [0,1,2,3].forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; if(u.permission_lvl===n) o.selected=true; permSel.appendChild(o); });
+        const save = document.createElement('button'); save.className='ghost'; save.textContent='Save';
+        save.addEventListener('click', async ()=>{
+          try{ await db.collection('user_data').doc(uid).update({ role: roleSel.value, permission_lvl: parseInt(permSel.value,10) }); showAuthMsg('User updated'); }
+          catch(e){ showAuthMsg('Update failed: '+e.message,true); }
+        });
+        right.appendChild(roleSel); right.appendChild(permSel); right.appendChild(save);
+        item.appendChild(left); item.appendChild(right); usersBox.appendChild(item);
+      });
+    }, err=>{ console.error('users onSnapshot',err); usersBox.innerHTML = `<div class="muted">Users error: ${escapeHtml(err.message||String(err))}</div>`; });
+  }catch(e){ console.error('subscribeUsers', e); usersBox.innerHTML = `<div class="muted">Permission error reading users</div>`; }
+}
 
-    function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;"); }
+/* -------------- small UI control for create panels -------------- */
+function updateCreatePanels(){
+  const pl = currentUserData ? (currentUserData.permission_lvl || 0) : 0;
+  createLinkCard.style.display = pl >= 2 ? 'block' : 'none';
+  createCatCard.style.display = pl >= 2 ? 'block' : 'none';
+  linksHint.textContent = pl < 1 ? 'No view permission' : '';
+  // Admin panel visibility is toggled by navAdmin earlier in auth listener
+  document.getElementById('nav-admin').style.display = (currentUserData && (currentUserData.role === 'admin' || currentUserData.role === 'owner')) ? 'block' : 'none';
+}
 
-    // Attach create handlers
-    btnCreateLink.addEventListener('click', createLink);
-    btnCreateCategory.addEventListener('click', createCategory);
+/* Update create panels whenever user_data changes */
+const observeUserDataInterval = setInterval(()=> {
+  if(currentUserData){ updateCreatePanels(); clearInterval(observeUserDataInterval); }
+}, 300);
 
-    // quick subscribe to categories on load even if not yet approved (so select populates)
-    function init(){ subscribeCategories(); }
-    init();
-  </script>
+/* -------------- init: attach basic click for sidebar tabs to change active class (visual) -------------- */
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    // visual active handled above in activateTab
+    // show/hide sections accordingly (activateTab function)
+    activateTab(btn.dataset.tab);
+  });
+});
+
+/* Exported for debugging if needed */
+window._lj = { auth, db };
+
+</script>
 </body>
 </html>
